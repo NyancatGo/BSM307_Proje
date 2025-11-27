@@ -61,7 +61,7 @@ Projeyi kendi bilgisayarınızda çalıştırmak için:
 
 2.  **Gerekli Kütüphaneleri Kurun:**
     ```bash
-    pip install networkx matplotlib numpy
+    py -m pip install networkx matplotlib numpy 
     ```
 
 3.  **Başlatın:**
