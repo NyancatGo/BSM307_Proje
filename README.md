@@ -56,7 +56,7 @@ Projeyi kendi bilgisayarınızda çalıştırmak için:
 
 1.  **Projeyi İndirin:**
     ```bash
-    git clone [https://github.com/KULLANICI_ADI/REPO_ADI.git](https://github.com/KULLANICI_ADI/REPO_ADI.git)
+    git clone https://github.com/NyancatGo/BSM307_Proje.git
     ```
 
 2.  **Gerekli Kütüphaneleri Kurun:**
