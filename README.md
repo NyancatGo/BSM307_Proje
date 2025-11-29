@@ -1,73 +1,90 @@
-# 🌐 QoS Odaklı Çok Amaçlı Rotalama Projesi
-**Ders:** BSM307 - Bilgisayar Ağları (Güz 2025)
+# 🌐 QoS Odaklı Akıllı Rotalama ve Web Simülasyonu (BSM307)
+
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=flat&logo=python)
+![Flask](https://img.shields.io/badge/Web-Flask-green?style=flat&logo=flask)
+![License](https://img.shields.io/badge/Course-BSM307-orange)
+![Status](https://img.shields.io/badge/Status-Development-red)
+
+**Ders:** BSM307 - Bilgisayar Ağları (Güz 2025)  
+**Proje Konusu:** QoS Odaklı Çok Amaçlı Rotalama için Meta-Sezgisel ve Pekiştirmeli Öğrenme Yaklaşımları
 
 ---
 
-## 1. Proje Nedir? (Özet)
-Bu proje, 250 bilgisayardan (düğümden) oluşan karmaşık bir ağda, veriyi A noktasından B noktasına götüren **"en mükemmel yolu"** bulan bir simülasyondur.
+## 📖 1. Proje Özeti
+Bu proje, modern veri merkezi ve bulut ağlarında karşılaşılan **Rotalama (Routing)** problemini çözmek için geliştirilmiş web tabanlı bir simülasyondur. 250 düğümlü (veya opsiyonel 1000 düğümlü) karmaşık bir ağ üzerinde, veriyi **A noktasından B noktasına** götürecek en optimum yolu bulur.
 
-Normal navigasyonlar sadece "en kısa yolu" arar. Ancak bu projede geliştirdiğimiz sistem, **3 farklı kurala** aynı anda uymaya çalışır:
-1.  **Hız:** Veri çok beklememeli (Düşük Gecikme).
-2.  **Sağlamlık:** Yol üzerindeki cihazlar bozulmamalı (Yüksek Güvenilirlik).
-3.  **Genişlik:** Yol tıkanık olmamalı (Yüksek Bant Genişliği).
-
-Bu problem bilgisayar bilimlerinde **NP-Hard** (Çözülmesi Çok Zor) olarak bilinir. Bu yüzden klasik yöntemler yerine "Yapay Zeka" benzeri akıllı algoritmalar kullanılmıştır.
+Sistem, klasik "en kısa yol" algoritmalarının aksine, **Hizmet Kalitesi (QoS)** gereksinimlerini sağlamak için şu 3 metriği aynı anda optimize eder:
+1.  **⚡ Gecikme (Delay):** Verinin iletim süresini minimize eder.
+2.  **🛡️ Güvenilirlik (Reliability):** Yolun kopma ihtimalini minimize eder (Maksimizasyon).
+3.  **🛣️ Kaynak Kullanımı (Resource):** Bant genişliği yüksek olan yolları tercih eder.
 
 ---
 
-## 2. Nasıl Puanlıyoruz? (Matematiksel Mantık)
-Sistem, bulduğu her yola bir **"Karne Puanı"** (Total Cost) verir. Bu puan ne kadar düşükse, yol o kadar iyidir.
+## 🧠 2. Kullanılan Algoritmalar (4 Yaklaşım)
+Projede, problemin çözümü için 4 farklı algoritma geliştirilmiş ve birbirleriyle kıyaslanmıştır:
 
-Puanlama formülü şu şekildedir:
-> **Puan = (Gecikme Puanı) + (Güvensizlik Puanı) + (Darboğaz Puanı)**
-
-Kullanıcı arayüzden bu kriterlerin önem derecesini (Ağırlıklarını) değiştirebilir. Örneğin; *"Hız benim için %80 önemli, güvenlik %20 önemli"* diyebilir.
-
----
-
-## 3. Ağın Özellikleri
-Projede oluşturulan sanal ağ, gerçek bir veri merkezini taklit eder:
-* **Düğüm Sayısı:** 250 adet.
-* **Bağlantı Tipi:** Rastgele (Erdős-Rényi Modeli).
-* **Değişkenler:** Her kablonun hızı ve her cihazın bozulma ihtimali birbirinden farklıdır ve rastgele atanır.
+| Algoritma | Tür | Açıklama |
+|-----------|-----|----------|
+| **🐜 Karınca Kolonisi (ACO)** | Meta-Sezgisel | Doğadaki karıncaların feromon izi bırakarak en kısa yolu bulma davranışını taklit eder. |
+| **🧬 Genetik Algoritma (GA)** | Meta-Sezgisel | Evrim teorisindeki "Doğal Seçilim", "Çaprazlama" ve "Mutasyon" yöntemlerini kullanır. |
+| **🤖 Q-Learning (RL)** | Pekiştirmeli Öğrenme | Bir ajanın çevreyle etkileşime girerek ödül/ceza mekanizmasıyla doğru yolu öğrenmesini sağlar. |
+| **📍 Dijkstra** | Klasik (Deterministik) | Kıyaslama (Benchmark) amacıyla kullanılan, en kısa yolu matematiksel kesinlikle bulan referans algoritmadır. |
 
 ---
 
-## 4. Kullanılan Akıllı Algoritmalar
-Milyarlarca yol ihtimalini tek tek denemek yıllar süreceği için, doğadan ilham alan iki yöntem kullandık:
+## ⚙️ 3. Teknik Mimari ve Matematiksel Model
+Proje, **Python (Backend)** ve **HTML/JS (Frontend)** teknolojilerini birleştiren hibrit bir yapıdadır.
 
-### 🐜 A. Karınca Kolonisi (ACO)
-Gerçek karıncaların yiyecek ararken feromon (koku) bırakması taklit edilir.
-* Sanal karıncalar haritaya salınır.
-* Hedefe hızlı ve güvenli varan karınca, geçtiği yola yüksek puan (feromon) bırakır.
-* Diğer karıncalar kokusu (puanı) yüksek yolu takip eder.
+### Matematiksel Maliyet Fonksiyonu (Fitness Function)
+Bir yolun kalitesi ($TotalCost$), aşağıdaki ağırlıklı toplam formülü ile hesaplanır:
 
-### 🧬 B. Genetik Algoritma (GA)
-Evrim teorisi taklit edilir.
-* Rastgele 20 farklı yol oluşturulur.
-* Bu yollar "çaprazlanır" (birinin başı ile diğerinin sonu birleşir).
-* Kötü yollar elenir, iyi yollar hayatta kalır ve "en iyi yol" evrimleşerek ortaya çıkar.
+> **Skor = (W1 × Gecikme) + (W2 × Güvenilirlik_Maliyeti) + (W3 × Kaynak_Maliyeti)**
 
----
+* **Güvenilirlik:** Çarpımsal olduğu için `-log(Reliability)` alınarak toplamsal maliyete dönüştürülmüştür.
+* **Kaynak:** `1000 / Bant Genişliği` formülü ile darboğaz yaratan yollara ceza puanı verilir.
 
-## 5. Kurulum ve Çalıştırma
+### Proje Dosya Yapısı
+```text
+/BSM307_Proje
+  ├── app.py               # Flask Web Sunucusu (Ana Başlatıcı)
+  ├── algorithms.py        # 4 Algoritmanın kodları (ACO, GA, Q-Learning, Dijkstra)
+  ├── network_generator.py # 250 Düğümlü Ağ Oluşturucu Modül
+  ├── utils.py             # Matematiksel hesaplama araçları
+  ├── /templates
+  │     └── index.html     # Web Arayüz Tasarımı (HTML)
+  ├── /static
+  │     ├── style.css      # Stil Dosyası
+  │     └── script.js      # Harita Çizimi (Vis.js / Cytoscape)
+  └── requirements.txt     # Gerekli kütüphaneler
+```
 
-Projeyi kendi bilgisayarınızda çalıştırmak için:
+## 🚀 5. Kurulum ve Çalıştırma
 
-1.  **Projeyi İndirin:**
+Projeyi çalıştırmak için aşağıdaki adımları izleyin:
+
+1.  **Depoyu İndirin:**
     ```bash
-    git clone https://github.com/NyancatGo/BSM307_Proje.git
+    git clone [https://github.com/NyancatGo/BSM307_Proje.git](https://github.com/NyancatGo/BSM307_Proje.git)
+    cd BSM307_Proje
     ```
 
-2.  **Gerekli Kütüphaneleri Kurun:**
+2.  **Kütüphaneleri Yükleyin:**
     ```bash
-    py -m pip install networkx matplotlib numpy 
+    pip install networkx matplotlib numpy flask pandas
     ```
 
-3.  **Başlatın:**
+3.  **Uygulamayı Başlatın:**
     ```bash
-    python main.py
+    python app.py
     ```
 
 
+---
 
+## 📅 Önemli Tarihler
+* **Kod Teslimi:** 31 Aralık 2025
+* **Video Teslimi:** 31 Aralık 2025
+* **Final Raporu:** 7 Ocak 2026
+
+---
+*BSM307 Güz Dönemi Projesi - Tüm Hakları Saklıdır.*
