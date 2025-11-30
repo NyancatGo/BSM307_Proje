@@ -1,42 +1,63 @@
 import network_generator
 import algorithms
 import time
+import os
+
+def ekrani_temizle():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 def main():
-    print("\n=== BSM307 PROJE SİMÜLASYONU BAŞLATILIYOR ===\n")
+    ekrani_temizle()
+    print("\n" + "="*75)
+    print("🚀 BSM307 - QOS ROTALAMA PROJESİ (FİNAL SUNUM MODU)")
+    print("="*75)
     
-    # 1. Ağı Oluştur
-    my_network = network_generator.create_network()
+    print("\n[1/3] Ağ Topolojisi Hazırlanıyor (250 Düğüm)...")
+    Ag = network_generator.create_network()
     
-    # Başlangıç ve Bitiş Noktalarını Seç
-    source_node = 0
-    target_node = 249
+    baslangic, bitis = 0, 249
     
-    print(f"\nRotamız: Düğüm {source_node} ---> Düğüm {target_node}")
-    print("-" * 50)
+    if not algorithms.nx.has_path(Ag, baslangic, bitis):
+        print("❌ HATA: Yol yok! Yeniden başlatın.")
+        return
+
+    print(f"\n[2/3] Algoritmalar Yarışıyor (Hedef: {baslangic} -> {bitis})")
+    print("      Lütfen bekleyiniz, yapay zeka en iyi yolu hesaplıyor...\n")
     
-    # 2. Algoritmayı Çalıştır ve Süre Tut
-    start_time = time.time()
-    
-    best_path, best_score = algorithms.ant_colony_optimization(
-        my_network, 
-        source=source_node, 
-        target=target_node,
-        num_ants=30,     # 30 Karınca
-        iterations=50    # 50 Tur
-    )
-    
-    end_time = time.time()
-    
-    # 3. Sonuçları Ekrana Bas
-    print("-" * 50)
-    if best_path:
-        print(f"✅ SONUÇ BAŞARILI!")
-        print(f"📍 Bulunan Yol: {best_path}")
-        print(f"⭐ Toplam Skor (Maliyet): {best_score:.4f}")
-        print(f"⏱️ Hesaplama Süresi: {end_time - start_time:.4f} saniye")
-    else:
-        print("❌ Yol Bulunamadı! (Graf kopuk olabilir, tekrar deneyin)")
+    print("-" * 80)
+    print(f"{'ALGORİTMA':<25} | {'SKOR (Maliyet)':<15} | {'SÜRE (sn)':<12} | {'ADIM'}")
+    print("-" * 80)
+
+    # 1. KARINCA KOLONİSİ (ACO)
+    # 30 Karınca, 30 Tur (Yeterince iyi sonuç için ideal)
+    basla = time.time()
+    yol, skor = algorithms.karinca_kolonisi_algoritmasi(Ag, baslangic, bitis, karinca_sayisi=30, tur_sayisi=30)
+    sure = time.time() - basla
+    print(f"{'1. ACO (Karınca)':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+
+    # 2. GENETİK ALGORİTMA (GA)
+    # 50 Popülasyon, 50 Nesil (Artık çok daha akıllı!)
+    basla = time.time()
+    yol, skor = algorithms.genetik_algoritma(Ag, baslangic, bitis, populasyon_buyuklugu=50, nesil_sayisi=50)
+    sure = time.time() - basla
+    print(f"{'2. GA (Genetik)':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+
+    # 3. Q-LEARNING
+    # 200 Bölüm (Öğrenmesi için yeterli süre)
+    basla = time.time()
+    yol, skor = algorithms.q_ogrenme_algoritmasi(Ag, baslangic, bitis, bolum_sayisi=200)
+    sure = time.time() - basla
+    print(f"{'3. Q-Learning':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+
+    # 4. YAPAY ARI KOLONİSİ (ABC)
+    # 30 Arı, 30 Tur
+    basla = time.time()
+    yol, skor = algorithms.yapay_ari_kolonisi(Ag, baslangic, bitis, koloni_boyutu=30, tur_sayisi=30)
+    sure = time.time() - basla
+    print(f"{'4. ABC (Arı)':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+
+    print("-" * 80)
+    print("✅ HESAPLAMA TAMAMLANDI! Sonuçlar sunuma hazırdır.")
 
 if __name__ == "__main__":
     main()

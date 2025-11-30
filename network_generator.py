@@ -1,27 +1,54 @@
 import networkx as nx
 import random
 
-# PDF'teki Proje Ayarları
-NUM_NODES = 250         # Düğüm Sayısı
-CONN_PROB = 0.4         # Bağlantı Olasılığı
+# Varsayılan Proje Ayarları (PDF'e Uygun)
+DEFAULT_NODES = 250         # Standart Düğüm Sayısı
+DEFAULT_PROB = 0.4          # Bağlantı Olasılığı
 
-def create_network():
-    print(f"--- Ağ Oluşturuluyor (N={NUM_NODES}, P={CONN_PROB}) ---")
+def create_network(node_count=DEFAULT_NODES, conn_prob=DEFAULT_PROB, seed=None):
+    """
+    Gelişmiş Ağ Oluşturucu (Backend Odaklı)
     
-    # 1. Adım: Topolojiyi Oluştur (Erdos-Renyi Modeli)
-    # directed=True çünkü veri akışı tek yönlü olabilir
-    G = nx.erdos_renyi_graph(n=NUM_NODES, p=CONN_PROB, directed=True)
+    Parametreler:
+    - node_count: Düğüm sayısı (Varsayılan 250, Ek puan için 1000 yapılabilir)
+    - conn_prob: Bağlantı yoğunluğu
+    - seed: Tekrarlanabilirlik için kilit sayı (None ise her seferinde rastgele)
+    """
     
-    # [cite_start]2. Adım: Düğüm (Node) Özelliklerini Ata [cite: 28-30]
+    # 1. Tekrarlanabilirlik Ayarı (Seed)
+    # Bu sayede aynı seed'i verirsen her seferinde birebir aynı harita oluşur.
+    if seed is not None:
+        random.seed(seed)
+    
+    print(f"--- Ağ Oluşturuluyor (N={node_count}, P={conn_prob}, Seed={seed}) ---")
+    
+    # 2. Topolojiyi Oluştur (Erdos-Renyi Modeli)
+    # directed=True: Trafik tek yönlü akabilir (Gerçekçi ağ)
+    G = nx.erdos_renyi_graph(n=node_count, p=conn_prob, directed=True, seed=seed)
+    
+    # 3. Düğüm (Router) Özelliklerini Ata
     for node in G.nodes():
-        G.nodes[node]['processing_delay'] = random.uniform(0.5, 2.0)  # 0.5 - 2.0 ms
-        G.nodes[node]['reliability'] = random.uniform(0.95, 0.999)    # %95 - %99.9
+        # İşlem Gecikmesi: 0.5 - 2.0 ms
+        G.nodes[node]['processing_delay'] = random.uniform(0.5, 2.0)
+        # Donanım Güvenilirliği: %95 - %99.9
+        G.nodes[node]['reliability'] = random.uniform(0.95, 0.999)
 
-    # [cite_start]3. Adım: Bağlantı (Link) Özelliklerini Ata [cite: 32-35]
+    # 4. Bağlantı (Kablo) Özelliklerini Ata
     for u, v in G.edges():
-        G.edges[u, v]['bandwidth'] = random.randint(100, 1000)      # 100 - 1000 Mbps
-        G.edges[u, v]['delay'] = random.uniform(3, 15)              # 3 - 15 ms
-        G.edges[u, v]['reliability'] = random.uniform(0.95, 0.999)  # %95 - %99.9
+        # Bant Genişliği: 100 - 1000 Mbps (Tamsayı)
+        G.edges[u, v]['bandwidth'] = random.randint(100, 1000)
+        # İletim Gecikmesi: 3 - 15 ms
+        G.edges[u, v]['delay'] = random.uniform(3, 15)
+        # Hat Güvenilirliği: %95 - %99.9
+        G.edges[u, v]['reliability'] = random.uniform(0.95, 0.999)
 
-    print(f"✅ Ağ Hazır! Toplam Bağlantı: {G.number_of_edges()}")
+    # 5. Bağlılık Kontrolü (Bilgi Amaçlı)
+    if nx.is_strongly_connected(G):
+        status = "Tam Bağlı (Her yerden her yere gidilebilir)"
+    else:
+        status = "Parçalı (Bazı düğümler arası yol olmayabilir)"
+
+    print(f"✅ Ağ Hazır! Durum: {status}")
+    print(f"📊 İstatistik: {G.number_of_nodes()} Düğüm, {G.number_of_edges()} Bağlantı")
+    
     return G

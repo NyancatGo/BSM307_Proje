@@ -1,9 +1,9 @@
 # 🌐 QoS Odaklı Akıllı Rotalama ve Web Simülasyonu (BSM307)
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=flat&logo=python)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=flat&logo=python)
 ![Flask](https://img.shields.io/badge/Web-Flask-green?style=flat&logo=flask)
 ![License](https://img.shields.io/badge/Course-BSM307-orange)
-![Status](https://img.shields.io/badge/Status-Development-red)
+![Status](https://img.shields.io/badge/Status-Completed-success)
 
 **Ders:** BSM307 - Bilgisayar Ağları (Güz 2025)  
 **Proje Konusu:** QoS Odaklı Çok Amaçlı Rotalama için Meta-Sezgisel ve Pekiştirmeli Öğrenme Yaklaşımları
@@ -11,34 +11,37 @@
 ---
 
 ## 📖 1. Proje Özeti
-Bu proje, modern veri merkezi ve bulut ağlarında karşılaşılan **Rotalama (Routing)** problemini çözmek için geliştirilmiş web tabanlı bir simülasyondur. 250 düğümlü (veya opsiyonel 1000 düğümlü) karmaşık bir ağ üzerinde, veriyi **A noktasından B noktasına** götürecek en optimum yolu bulur.
+Bu proje, modern veri merkezi ve bulut ağlarında (Cloud/Data Center) karşılaşılan **Rotalama (Routing)** problemini çözmek için geliştirilmiş yapay zeka tabanlı bir simülasyondur. 
 
-Sistem, klasik "en kısa yol" algoritmalarının aksine, **Hizmet Kalitesi (QoS)** gereksinimlerini sağlamak için şu 3 metriği aynı anda optimize eder:
-1.  **⚡ Gecikme (Delay):** Verinin iletim süresini minimize eder.
-2.  **🛡️ Güvenilirlik (Reliability):** Yolun kopma ihtimalini minimize eder (Maksimizasyon).
-3.  **🛣️ Kaynak Kullanımı (Resource):** Bant genişliği yüksek olan yolları tercih eder.
+250 düğümlü (veya ölçeklenebilir 1000+ düğümlü) karmaşık ve stokastik bir ağ üzerinde, veriyi **A noktasından B noktasına** götürecek en optimum yolu bulur. Klasik algoritmaların yetersiz kaldığı çok değişkenli senaryolarda, 4 farklı yapay zeka algoritmasını yarıştırır.
+
+### 🎯 Optimizasyon Hedefleri (QoS Metrikleri)
+Sistem, bir yol seçerken şu 3 çelişen metriği aynı anda optimize eder (Multi-Objective Optimization):
+1.  **⚡ Gecikme (Delay):** Verinin iletim süresini minimize eder (Minimizasyon).
+2.  **🛡️ Güvenilirlik (Reliability):** Yolun kopma ihtimalini en aza indirir (Maksimizasyon).
+3.  **🛣️ Kaynak Kullanımı (Resource):** Bant genişliği darboğazlarını engeller (Minimizasyon).
 
 ---
 
-## 🧠 2. Kullanılan Algoritmalar (4 Yaklaşım)
-Projede, problemin çözümü için 4 farklı algoritma geliştirilmiş ve birbirleriyle kıyaslanmıştır:
+## 🧠 2. Kullanılan Yapay Zeka Algoritmaları
+Proje kapsamında, problemin çözümü için **4 farklı modern yaklaşım** geliştirilmiş ve performansları kıyaslanmıştır:
 
 | Algoritma | Tür | Açıklama |
 |-----------|-----|----------|
-| **🐜 Karınca Kolonisi (ACO)** | Meta-Sezgisel | Doğadaki karıncaların feromon izi bırakarak en kısa yolu bulma davranışını taklit eder. |
-| **🧬 Genetik Algoritma (GA)** | Meta-Sezgisel | Evrim teorisindeki "Doğal Seçilim", "Çaprazlama" ve "Mutasyon" yöntemlerini kullanır. |
-| **🤖 Q-Learning (RL)** | Pekiştirmeli Öğrenme | Bir ajanın çevreyle etkileşime girerek ödül/ceza mekanizmasıyla doğru yolu öğrenmesini sağlar. |
-| **📍 Dijkstra** | Klasik (Deterministik) | Kıyaslama (Benchmark) amacıyla kullanılan, en kısa yolu matematiksel kesinlikle bulan referans algoritmadır. |
+| **🐜 Karınca Kolonisi (ACO)** | Meta-Sezgisel | Doğadaki karıncaların feromon izi bırakarak en kısa yolu bulma davranışını simüle eder. |
+| **🐝 Yapay Arı Kolonisi (ABC)** | Meta-Sezgisel | Arıların nektar kaynaklarını (yolları) arama, dans ile haberleşme ve keşfetme zekasını kullanır. |
+| **🧬 Genetik Algoritma (GA)** | Meta-Sezgisel | Evrim teorisindeki "Doğal Seçilim", "Çaprazlama" ve "Mutasyon" yöntemleriyle en iyi rotayı nesiller içinde geliştirir. |
+| **🤖 Q-Learning (RL)** | Pekiştirmeli Öğrenme | Bir ajanın çevreyle etkileşime girerek (deneme-yanılma) ödül/ceza mekanizmasıyla doğru yolu öğrenmesini sağlar. |
 
 ---
 
 ## ⚙️ 3. Teknik Mimari ve Matematiksel Model
-Proje, **Python (Backend)** ve **HTML/JS (Frontend)** teknolojilerini birleştiren hibrit bir yapıdadır.
+Proje, **Python (Backend)** hesaplama motoru ve **HTML/JS (Frontend)** görselleştirme arayüzünü birleştiren modüler bir yapıdadır.
 
 ### Matematiksel Maliyet Fonksiyonu (Fitness Function)
 Bir yolun kalitesi ($TotalCost$), aşağıdaki ağırlıklı toplam formülü ile hesaplanır:
 
-> **Skor = (W1 × Gecikme) + (W2 × Güvenilirlik_Maliyeti) + (W3 × Kaynak_Maliyeti)**
+$$Skor = (W_{1} \times Gecikme) + (W_{2} \times GüvenilirlikMaliyeti) + (W_{3} \times KaynakMaliyeti)$$
 
 * **Güvenilirlik:** Çarpımsal olduğu için `-log(Reliability)` alınarak toplamsal maliyete dönüştürülmüştür.
 * **Kaynak:** `1000 / Bant Genişliği` formülü ile darboğaz yaratan yollara ceza puanı verilir.
@@ -46,17 +49,17 @@ Bir yolun kalitesi ($TotalCost$), aşağıdaki ağırlıklı toplam formülü il
 ### Proje Dosya Yapısı
 ```text
 /BSM307_Proje
-  ├── app.py               # Flask Web Sunucusu (Ana Başlatıcı)
-  ├── algorithms.py        # 4 Algoritmanın kodları (ACO, GA, Q-Learning, Dijkstra)
-  ├── network_generator.py # 250 Düğümlü Ağ Oluşturucu Modül
-  ├── utils.py             # Matematiksel hesaplama araçları
+  ├── app.py               # Flask Web Sunucusu (Web Arayüzü Başlatıcı)
+  ├── main.py              # Terminal Üzerinden Performans Testi (Benchmark)
+  ├── algorithms.py        # 4 Yapay Zeka Algoritmasının Motoru (ACO, ABC, GA, QL)
+  ├── network_generator.py # Gelişmiş Ağ Oluşturucu (Seed & JSON Desteği)
   ├── /templates
   │     └── index.html     # Web Arayüz Tasarımı (HTML)
   ├── /static
   │     ├── style.css      # Stil Dosyası
   │     └── script.js      # Harita Çizimi (Vis.js / Cytoscape)
   └── requirements.txt     # Gerekli kütüphaneler
-```
+  ```
 
 ## 🚀 5. Kurulum ve Çalıştırma
 
