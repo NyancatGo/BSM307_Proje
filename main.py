@@ -1,9 +1,18 @@
+"""
+BSM307 - Bilgisayar Ağları Projesi
+Grup Üyeleri:
+1. [Ad Soyad] - [Numara]
+2. [Ad Soyad] - [Numara]
+...
+"""
 import network_generator
 import algorithms
 import time
 import os
+import pandas as pd  # Excel/CSV kaydı için gerekli
 
 def ekrani_temizle():
+    # İşletim sistemine göre terminali temizler (Windows/Mac/Linux uyumlu)
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def main():
@@ -13,12 +22,16 @@ def main():
     print("="*75)
     
     print("\n[1/3] Ağ Topolojisi Hazırlanıyor (250 Düğüm)...")
+    
+    # SEED=42 ile haritayı sabitliyoruz ki her testte aynı sonucu alalım.
+    # Adil bir yarış için bu şart.
     Ag = network_generator.create_network()
     
     baslangic, bitis = 0, 249
     
+    # Yol kontrolü: Eğer şans eseri yol yoksa uyar.
     if not algorithms.nx.has_path(Ag, baslangic, bitis):
-        print("❌ HATA: Yol yok! Yeniden başlatın.")
+        print("❌ HATA: Kaynak ve Hedef arasında yol yok! Seed değerini değiştirin.")
         return
 
     print(f"\n[2/3] Algoritmalar Yarışıyor (Hedef: {baslangic} -> {bitis})")
@@ -28,36 +41,66 @@ def main():
     print(f"{'ALGORİTMA':<25} | {'SKOR (Maliyet)':<15} | {'SÜRE (sn)':<12} | {'ADIM'}")
     print("-" * 80)
 
+    # Sonuçları Excel'e aktarmak için hafızada tutuyoruz
+    veriler = []
+
     # 1. KARINCA KOLONİSİ (ACO)
-    # 30 Karınca, 30 Tur (Yeterince iyi sonuç için ideal)
+    # 30 Karınca, 30 Tur (İdeal denge)
     basla = time.time()
     yol, skor = algorithms.karinca_kolonisi_algoritmasi(Ag, baslangic, bitis, karinca_sayisi=30, tur_sayisi=30)
     sure = time.time() - basla
-    print(f"{'1. ACO (Karınca)':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+    adim = len(yol) if yol else 0
+    print(f"{'1. ACO (Karınca)':<25} | {skor:<15.4f} | {sure:<12.4f} | {adim}")
+    
+    # Listeye ekle
+    veriler.append({'Algoritma': 'Karınca (ACO)', 'Skor': skor, 'Sure_sn': sure, 'Adim_Sayisi': adim})
 
     # 2. GENETİK ALGORİTMA (GA)
-    # 50 Popülasyon, 50 Nesil (Artık çok daha akıllı!)
+    # 50 Popülasyon, 50 Nesil (Optimum zeka için)
     basla = time.time()
     yol, skor = algorithms.genetik_algoritma(Ag, baslangic, bitis, populasyon_buyuklugu=50, nesil_sayisi=50)
     sure = time.time() - basla
-    print(f"{'2. GA (Genetik)':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+    adim = len(yol) if yol else 0
+    print(f"{'2. GA (Genetik)':<25} | {skor:<15.4f} | {sure:<12.4f} | {adim}")
+    
+    veriler.append({'Algoritma': 'Genetik (GA)', 'Skor': skor, 'Sure_sn': sure, 'Adim_Sayisi': adim})
 
-    # 3. Q-LEARNING
-    # 200 Bölüm (Öğrenmesi için yeterli süre)
+    # 3. Q-LEARNING (Pekiştirmeli Öğrenme)
+    # 200 Bölüm (Öğrenmesi için yeterli tekrar)
     basla = time.time()
     yol, skor = algorithms.q_ogrenme_algoritmasi(Ag, baslangic, bitis, bolum_sayisi=200)
     sure = time.time() - basla
-    print(f"{'3. Q-Learning':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+    adim = len(yol) if yol else 0
+    print(f"{'3. Q-Learning':<25} | {skor:<15.4f} | {sure:<12.4f} | {adim}")
+    
+    veriler.append({'Algoritma': 'Q-Learning', 'Skor': skor, 'Sure_sn': sure, 'Adim_Sayisi': adim})
 
     # 4. YAPAY ARI KOLONİSİ (ABC)
-    # 30 Arı, 30 Tur
+    # 30 Arı, 30 Tur (Hız şampiyonu)
     basla = time.time()
     yol, skor = algorithms.yapay_ari_kolonisi(Ag, baslangic, bitis, koloni_boyutu=30, tur_sayisi=30)
     sure = time.time() - basla
-    print(f"{'4. ABC (Arı)':<25} | {skor:<15.4f} | {sure:<12.4f} | {len(yol) if yol else 0}")
+    adim = len(yol) if yol else 0
+    print(f"{'4. ABC (Arı)':<25} | {skor:<15.4f} | {sure:<12.4f} | {adim}")
+    
+    veriler.append({'Algoritma': 'Arı (ABC)', 'Skor': skor, 'Sure_sn': sure, 'Adim_Sayisi': adim})
 
     print("-" * 80)
-    print("✅ HESAPLAMA TAMAMLANDI! Sonuçlar sunuma hazırdır.")
+    
+    # [3/3] SONUÇLARI KAYDETME (DİREKT EXCEL .xlsx)
+    try:
+        df = pd.DataFrame(veriler)
+        
+        # Dosya adını .xlsx yapıyoruz (Gerçek Excel)
+        dosya_adi = "proje_sonuclari.xlsx"
+        
+        # Excel formatında kaydet
+        df.to_excel(dosya_adi, index=False)
+        
+        print(f"✅ HESAPLAMA TAMAMLANDI! Sonuçlar '{dosya_adi}' dosyasına kaydedildi.")
+
+    except Exception as e:
+        print(f"⚠️ Kayıt Uyarısı: {e} (Dosya açık olabilir veya openpyxl yüklü değil)")
 
 if __name__ == "__main__":
     main()
