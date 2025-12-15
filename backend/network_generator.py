@@ -2,7 +2,7 @@ import networkx as nx
 import random
 
 # Varsayılan Proje Ayarları (PDF'e Uygun)
-DEFAULT_NODES = 250         # Standart Düğüm Sayısı
+DEFAULT_NODES = 1000         # Standart Düğüm Sayısı
 DEFAULT_PROB = 0.4          # Bağlantı Olasılığı
 
 def create_network(node_count=DEFAULT_NODES, conn_prob=DEFAULT_PROB, seed=None):
