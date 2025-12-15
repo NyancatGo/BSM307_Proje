@@ -9,11 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.2.3",
-    "react": "^19.2.3",
-    "@react-three/drei": "^10.7.7",
     "@heroicons/react": "^2.2.0",
+    "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "recharts": "^3.6.0",
     "three": "^0.182.0"
   },
   "devDependencies": {
