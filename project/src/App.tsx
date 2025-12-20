@@ -20,32 +20,38 @@ import {
     YAxis
 } from "recharts";
 
+// Ağırlık ve Talep Veri Tipleri
 type Weights = { wDelay: number; wReliability: number; wResource: number };
 type Demand = { src: number; dst: number; bw: number };
 
 const App: React.FC = () => {
+    // Grafik Verisi
     const [graph, setGraph] = useState<GraphData | null>(null);
     const [isLoadingMap, setIsLoadingMap] = useState(true);
 
+    // Test Senaryoları (CSV'den okunur)
     const [demands, setDemands] = useState<Demand[]>([]);
+
+    // Kullanıcı Seçimleri
     const [startNode, setStartNode] = useState<number>(8);
     const [endNode, setEndNode] = useState<number>(44);
-
     const [selectedAlgo, setSelectedAlgo] = useState<AlgorithmType>(AlgorithmType.GENETIC);
     const [autoRotate, setAutoRotate] = useState<boolean>(true);
 
+    // Algoritma Ağırlıkları (Gecikme, Güvenilirlik, Kaynak)
     const [weights, setWeights] = useState<Weights>({
         wDelay: 0.34,
         wReliability: 0.33,
         wResource: 0.33
     });
 
+    // Hesaplama Sonuçları
     const [result, setResult] = useState<ResultType | null>(null);
     const [isCalculating, setIsCalculating] = useState(false);
 
+    // UI Durumları
     const [settingsOpen, setSettingsOpen] = useState(true);
     const [resultsOpen, setResultsOpen] = useState(true);
-
     const [showComparison, setShowComparison] = useState(false);
     const [showTesting, setShowTesting] = useState(false);
     const [comparisonData, setComparisonData] = useState<any[]>([]);
@@ -55,15 +61,15 @@ const App: React.FC = () => {
             try {
                 setIsLoadingMap(true);
 
-                // ✅ 1. NODE DATA'yı OKU
+                // --- 1. DÜĞÜM (NODE) VERİLERİNİ YÜKLE ---
                 const nodeResponse = await fetch("/BSM307_317_Guz2025_TermProject_NodeData.csv");
                 const nodeText = await nodeResponse.text();
-                const nodeLines = nodeText.trim().split('\n').slice(1); // Header'ı atla
+                const nodeLines = nodeText.trim().split('\n').slice(1); // Başlığı atla
 
                 const nodes = nodeLines.map((line, idx) => {
                     const [id, s_ms, r_node] = line.split(';');
 
-                    // Fibonacci Sphere Calculation (moved from WorldMap)
+                    // Fibonacci Küresi ile Düğümleri Konumlandır (Görsel Dağılım İçin)
                     const phi = Math.acos(1 - 2 * (idx + 0.5) / nodeLines.length);
                     const theta = Math.PI * (1 + Math.sqrt(5)) * idx;
                     const ORBIT_RADIUS = 75;
@@ -78,12 +84,12 @@ const App: React.FC = () => {
                     };
                 });
 
-                console.log(`✅ Loaded ${nodes.length} nodes`);
+                console.log(`✅ ${nodes.length} düğüm yüklendi.`);
 
-                // ✅ 2. EDGE DATA'yı OKU
+                // --- 2. BAĞLANTI (LINK/EDGE) VERİLERİNİ YÜKLE ---
                 const edgeResponse = await fetch("/BSM307_317_Guz2025_TermProject_EdgeData.csv");
                 const edgeText = await edgeResponse.text();
-                const edgeLines = edgeText.trim().split('\n').slice(1); // Header'ı atla
+                const edgeLines = edgeText.trim().split('\n').slice(1);
 
                 const links = edgeLines.map(line => {
                     const [src, dst, capacity, delay, reliability] = line.split(';');
@@ -96,22 +102,19 @@ const App: React.FC = () => {
                     };
                 });
 
-                console.log(`✅ Loaded ${links.length} links`);
+                console.log(`✅ ${links.length} bağlantı yüklendi.`);
 
-                // ✅ 3. ADJACENCY MAP OLUŞTUR (Algoritmaların kullanması için)
+                // --- 3. KOMŞULUK HARİTASI (Adjacency Map) OLUŞTUR ---
+                // Algoritmaların hızlı erişimi için gereklidir
                 const adjacency = new Map<number, any[]>();
 
                 links.forEach(link => {
-                    // Source -> Target
-                    if (!adjacency.has(link.source)) {
-                        adjacency.set(link.source, []);
-                    }
+                    // Kaynak -> Hedef
+                    if (!adjacency.has(link.source)) adjacency.set(link.source, []);
                     adjacency.get(link.source)!.push(link);
 
-                    // Target -> Source (Undirected graph)
-                    if (!adjacency.has(link.target)) {
-                        adjacency.set(link.target, []);
-                    }
+                    // Hedef -> Kaynak (Yönsüz Graf Varsayımı)
+                    if (!adjacency.has(link.target)) adjacency.set(link.target, []);
                     adjacency.get(link.target)!.push({
                         ...link,
                         source: link.target,
@@ -119,9 +122,7 @@ const App: React.FC = () => {
                     });
                 });
 
-                console.log(`✅ Built adjacency map with ${adjacency.size} entries`);
-
-                // ✅ 4. GRAPH OBJECT OLUŞTUR
+                // --- 4. GRAF VERİSİNİ STATE'E KAYDET ---
                 const graphData: GraphData = {
                     nodes,
                     links,
@@ -130,7 +131,7 @@ const App: React.FC = () => {
 
                 setGraph(graphData);
 
-                // ✅ 5. DEMAND DATA'yı OKU (Test Senaryoları)
+                // --- 5. TEST SENARYOLARINI (DEMANDS) YÜKLE ---
                 try {
                     const demandResponse = await fetch("/BSM307_317_Guz2025_TermProject_DemandData.csv");
                     const demandText = await demandResponse.text();
@@ -146,19 +147,19 @@ const App: React.FC = () => {
                     });
 
                     setDemands(demands);
-                    console.log(`✅ Loaded ${demands.length} demand scenarios`);
+                    console.log(`✅ ${demands.length} test senaryosu yüklendi.`);
 
-                    // İlk demand'i otomatik seç
+                    // İlk senaryoyu varsayılan olarak seç
                     if (demands.length > 0) {
                         setStartNode(demands[0].src);
                         setEndNode(demands[0].dst);
                     }
                 } catch (e) {
-                    console.warn('Demand data not found, using defaults');
+                    console.warn('Talep verisi bulunamadı, varsayılanlar kullanılacak.');
                 }
 
             } catch (e) {
-                console.error("❌ CSV load error:", e);
+                console.error("❌ Veri Yükleme Hatası:", e);
             } finally {
                 setIsLoadingMap(false);
             }
@@ -167,6 +168,7 @@ const App: React.FC = () => {
         fetchMap();
     }, []);
 
+    // Seçilen Algoritmayı Çalıştır
     const computeByAlgo = (algo: AlgorithmType, g: GraphData, src: number, dst: number, w: Weights) => {
         if (algo === AlgorithmType.GENETIC) return runGeneticAlgorithm(g, src, dst, w);
         if (algo === AlgorithmType.ACO) return runACO(g, src, dst, w);
@@ -177,14 +179,16 @@ const App: React.FC = () => {
             path: [],
             metrics: { totalDelay: 0, totalReliability: 0, resourceCost: 0, weightedCost: 0 },
             executionTime: 0,
-            algorithmName: "Unknown"
+            algorithmName: "Bilinmiyor"
         } as ResultType;
     };
 
+    // "Hesapla" Butonu Tetikleyicisi
     const handleCalculate = () => {
         if (!graph) return;
         setIsCalculating(true);
 
+        // UI blocking'i önlemek için kısa gecikme
         window.setTimeout(() => {
             const res = computeByAlgo(selectedAlgo, graph, startNode, endNode, weights);
             setResult(res);
@@ -195,6 +199,7 @@ const App: React.FC = () => {
         }, 300);
     };
 
+    // "Tümünü Kıyasla" Butonu Tetikleyicisi
     const handleCompareAll = () => {
         if (!graph) return;
         setIsCalculating(true);
@@ -207,7 +212,7 @@ const App: React.FC = () => {
                 AlgorithmType.ABC
             ];
 
-            const iterations = 5;
+            const iterations = 5; // Daha stabil sonuç için 5 kez çalıştırıp ortalamasını al
             const averagedResults = algos.map((algo) => {
                 let totalWeightedCost = 0;
                 let minCost = Infinity;
@@ -217,6 +222,7 @@ const App: React.FC = () => {
                     const res = computeByAlgo(algo, graph, startNode, endNode, weights);
                     const c = res.metrics.weightedCost;
                     totalWeightedCost += c;
+                    // En düşük maliyetli koşuyu sakla
                     if (c < minCost) {
                         minCost = c;
                         bestRun = res;
@@ -227,7 +233,7 @@ const App: React.FC = () => {
 
                 return {
                     name: algo,
-                    res: bestRun!,
+                    res: bestRun!, // En iyi sonucu görselleştirme için kullanacağız
                     cost: avgCost,
                     color:
                         algo === AlgorithmType.GENETIC
@@ -240,8 +246,11 @@ const App: React.FC = () => {
                 };
             });
 
+            // En düşük maliyetli algoritma en üstte olsun
             averagedResults.sort((a, b) => a.cost - b.cost);
             setComparisonData(averagedResults);
+
+            // Haritada en başarılı algoritmanın yolunu göster
             if (averagedResults[0].res) setResult(averagedResults[0].res);
 
             setShowComparison(true);
@@ -250,6 +259,7 @@ const App: React.FC = () => {
         }, 1000);
     };
 
+    // Ağırlık Slider Kontrolü
     const normalizeWeights = (type: "delay" | "rel" | "res", value: number) => {
         const newW = { ...weights };
         if (type === "delay") newW.wDelay = value;
@@ -270,7 +280,7 @@ const App: React.FC = () => {
                     alignItems: "center"
                 }}
             >
-                Harita Yükleniyor...
+                <div>Harita ve Veriler Yükleniyor...</div>
             </div>
         );
 
@@ -286,7 +296,7 @@ const App: React.FC = () => {
                     alignItems: "center"
                 }}
             >
-                Harita Verisi Yok
+                Veri Yükleme Hatası: Graph verisi oluşmadı.
             </div>
         );
 
@@ -301,10 +311,10 @@ const App: React.FC = () => {
                 backgroundColor: "black",
                 color: "#e2e8f0",
                 overflow: "hidden",
-                fontFamily: "sans-serif"
+                fontFamily: "Inter, sans-serif"
             }}
         >
-            {/* BACKGROUND */}
+            {/* ARKAPLAN: 3D DÜNYA HARİTASI */}
             <div style={{ position: "absolute", inset: 0, zIndex: 0, width: "100%", height: "100%" }}>
                 <WorldMap
                     graph={graph}
@@ -315,7 +325,7 @@ const App: React.FC = () => {
                     algorithmName={
                         result?.algorithmName
                             ? result.algorithmName
-                            : selectedAlgo === AlgorithmType.GENETIC ? "Genetik Algoritma"
+                            : selectedAlgo === AlgorithmType.GENETIC ? "Genetik Algoritma (GA)"
                                 : selectedAlgo === AlgorithmType.ACO ? "Karınca Kolonisi (ACO)"
                                     : selectedAlgo === AlgorithmType.Q_LEARNING ? "Q-Learning (Pekiştirmeli Öğrenme)"
                                         : "Yapay Arı Kolonisi (ABC)"
@@ -323,7 +333,7 @@ const App: React.FC = () => {
                 />
             </div>
 
-            {/* HEADER */}
+            {/* BAŞLIK ÇUBUĞU */}
             <div
                 style={{
                     position: "absolute",
@@ -348,17 +358,17 @@ const App: React.FC = () => {
                     }}
                 >
                     <MapIcon style={{ width: "32px", height: "32px", color: "#3b82f6" }} />
-                    Uzay Ağı Analizi <span style={{ color: "#60a5fa", fontWeight: 300 }}>| Official Data</span>
+                    Çok Amaçlı KYS Yönlendirme Simülasyonu <span style={{ color: "#60a5fa", fontWeight: 300, fontSize: "16px" }}>| BSM307 Dönem Projesi</span>
                 </h1>
             </div>
 
-            {/* SETTINGS PANEL */}
+            {/* SOL PANEL: AYARLAR */}
             <div style={{ position: "absolute", top: "100px", left: "20px", width: settingsOpen ? "320px" : "50px", zIndex: 20, transition: "width 0.3s" }}>
                 <div style={{ backgroundColor: "rgba(15, 23, 42, 0.9)", backdropFilter: "blur(10px)", border: "1px solid #334155", borderRadius: "8px", overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)" }}>
                     <div onClick={() => setSettingsOpen(!settingsOpen)} style={{ padding: "12px", backgroundColor: "rgba(30, 41, 59, 0.9)", cursor: "pointer", borderBottom: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         {settingsOpen ? (
                             <span style={{ fontWeight: 600, color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
-                                <AdjustmentsHorizontalIcon style={{ width: "20px" }} /> Ayarlar
+                                <AdjustmentsHorizontalIcon style={{ width: "20px" }} /> Kontrol Paneli
                             </span>
                         ) : (
                             <AdjustmentsHorizontalIcon style={{ width: "24px", color: "#60a5fa", margin: "0 auto" }} />
@@ -367,11 +377,11 @@ const App: React.FC = () => {
 
                     {settingsOpen && (
                         <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "20px" }}>
-                            {/* DEMANDS */}
+                            {/* TALEP SEÇİMİ (DEMANDS) */}
                             {demands.length > 0 && (
                                 <div>
                                     <label style={{ display: "block", fontSize: "12px", textTransform: "uppercase", color: "#facc15", fontWeight: "bold", marginBottom: "8px" }}>
-                                        Test Senaryoları (Demand)
+                                        Test Senaryoları (Ön Tanımlı)
                                     </label>
                                     <select
                                         className="w-full bg-slate-800 border border-yellow-600 rounded p-2 text-xs text-yellow-100 focus:border-yellow-400 outline-none"
@@ -383,34 +393,34 @@ const App: React.FC = () => {
                                     >
                                         {demands.map((d, i) => (
                                             <option key={i} value={i}>
-                                                #{i + 1}: Node {d.src} -&gt; {d.dst} ({d.bw} Mbps)
+                                                #{i + 1}: Düğüm {d.src} -&gt; {d.dst} ({d.bw} Mbps)
                                             </option>
                                         ))}
                                     </select>
                                 </div>
                             )}
 
-                            {/* ALGO */}
+                            {/* ALGORİTMA SEÇİMİ */}
                             <div>
                                 <label style={{ display: "block", fontSize: "12px", textTransform: "uppercase", color: "#94a3b8", fontWeight: "bold", marginBottom: "8px" }}>
-                                    Algoritma
+                                    Algoritma Seçimi
                                 </label>
                                 <select
                                     className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-blue-500 outline-none"
                                     value={selectedAlgo}
                                     onChange={(e) => setSelectedAlgo(e.target.value as AlgorithmType)}
                                 >
-                                    <option value={AlgorithmType.GENETIC}>Genetic Algorithm</option>
-                                    <option value={AlgorithmType.ACO}>Ant Colony Optimization</option>
+                                    <option value={AlgorithmType.GENETIC}>Genetik Algoritma (GA)</option>
+                                    <option value={AlgorithmType.ACO}>Karınca Kolonisi (ACO)</option>
                                     <option value={AlgorithmType.Q_LEARNING}>Q-Learning (RL)</option>
-                                    <option value={AlgorithmType.ABC}>Artificial Bee Colony</option>
+                                    <option value={AlgorithmType.ABC}>Yapay Arı Kolonisi (ABC)</option>
                                 </select>
                             </div>
 
-                            {/* START-END */}
+                            {/* KAYNAK - HEDEF */}
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                                 <div>
-                                    <label style={{ fontSize: "12px", color: "#94a3b8" }}>Başlangıç</label>
+                                    <label style={{ fontSize: "12px", color: "#94a3b8" }}>Başlangıç (ID)</label>
                                     <input
                                         type="number"
                                         style={{ width: "100%", background: "rgba(0,0,0,0.5)", border: "1px solid #475569", color: "white", padding: "4px", borderRadius: "4px" }}
@@ -419,7 +429,7 @@ const App: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: "12px", color: "#94a3b8" }}>Hedef</label>
+                                    <label style={{ fontSize: "12px", color: "#94a3b8" }}>Hedef (ID)</label>
                                     <input
                                         type="number"
                                         style={{ width: "100%", background: "rgba(0,0,0,0.5)", border: "1px solid #475569", color: "white", padding: "4px", borderRadius: "4px" }}
@@ -429,15 +439,15 @@ const App: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* WEIGHTS */}
+                            {/* AĞIRLIK AYARLARI */}
                             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                                 <label style={{ fontSize: "12px", textTransform: "uppercase", color: "#94a3b8", fontWeight: "bold", borderBottom: "1px solid #334155", paddingBottom: "4px" }}>
-                                    Ağırlıklar (Cost Function)
+                                    Yönlendirme Kriterleri (Weights)
                                 </label>
 
                                 <div>
                                     <span style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                                        <span>Gecikme (W_delay)</span>
+                                        <span>Gecikme (Delay)</span>
                                         <span style={{ color: "#60a5fa" }}>{weights.wDelay}</span>
                                     </span>
                                     <input type="range" max="1" step="0.01" value={weights.wDelay} onChange={(e) => normalizeWeights("delay", parseFloat(e.target.value))} style={{ width: "100%" }} />
@@ -445,7 +455,7 @@ const App: React.FC = () => {
 
                                 <div>
                                     <span style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                                        <span>Güvenilirlik (W_rel)</span>
+                                        <span>Güvenilirlik (Reliability)</span>
                                         <span style={{ color: "#4ade80" }}>{weights.wReliability}</span>
                                     </span>
                                     <input type="range" max="1" step="0.01" value={weights.wReliability} onChange={(e) => normalizeWeights("rel", parseFloat(e.target.value))} style={{ width: "100%" }} />
@@ -453,14 +463,14 @@ const App: React.FC = () => {
 
                                 <div>
                                     <span style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                                        <span>Kaynak (W_res)</span>
+                                        <span>Kaynak/Bant Gen. (Resource)</span>
                                         <span style={{ color: "#c084fc" }}>{weights.wResource}</span>
                                     </span>
                                     <input type="range" max="1" step="0.01" value={weights.wResource} onChange={(e) => normalizeWeights("res", parseFloat(e.target.value))} style={{ width: "100%" }} />
                                 </div>
                             </div>
 
-                            {/* BUTTONS */}
+                            {/* AKSİYON BUTONLARI */}
                             <button
                                 onClick={handleCalculate}
                                 disabled={isCalculating}
@@ -481,7 +491,7 @@ const App: React.FC = () => {
                             >
                                 {isCalculating ? "Hesaplanıyor..." : (
                                     <>
-                                        <PlayIcon style={{ width: "20px" }} /> Başlat
+                                        <PlayIcon style={{ width: "20px" }} /> Rotayı Çiz
                                     </>
                                 )}
                             </button>
@@ -504,7 +514,7 @@ const App: React.FC = () => {
                                     gap: "8px"
                                 }}
                             >
-                                <ChartBarIcon style={{ width: "20px", color: "#facc15" }} /> Tümünü Kıyasla
+                                <ChartBarIcon style={{ width: "20px", color: "#facc15" }} /> Algoritma Yarıştır
                             </button>
 
                             <button
@@ -524,17 +534,17 @@ const App: React.FC = () => {
                                     gap: "8px"
                                 }}
                             >
-                                <AdjustmentsHorizontalIcon style={{ width: "20px" }} /> {showTesting ? "Testleri Kapat" : "Test Runner (20+ Cases)"}
+                                <AdjustmentsHorizontalIcon style={{ width: "20px" }} /> {showTesting ? "Otomatik Testi Kapat" : "Otomatik Test (20+ Senaryo)"}
                             </button>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* EXPERIMENT RUNNER */}
+            {/* DENEY MODÜLÜ (Görünürse) */}
             {showTesting && graph && <ExperimentRunner graph={graph} />}
 
-            {/* RESULTS PANEL */}
+            {/* SAĞ PANEL: SONUÇLAR */}
             {result && resultsOpen && (
                 <div
                     style={{
@@ -552,7 +562,7 @@ const App: React.FC = () => {
                     }}
                 >
                     <h3 style={{ fontWeight: "bold", color: "#4ade80", marginBottom: "10px", fontSize: "18px" }}>
-                        Sonuçlar Hazır
+                        Sonuç Raporu
                     </h3>
 
                     {showComparison && comparisonData.length > 0 ? (
@@ -574,11 +584,11 @@ const App: React.FC = () => {
                     ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "15px" }}>
                             <div style={{ background: "rgba(0,0,0,0.4)", padding: "10px", borderRadius: "4px", border: "1px solid #334155", textAlign: "center" }}>
-                                <div style={{ fontSize: "12px", color: "#94a3b8" }}>Algoritma</div>
+                                <div style={{ fontSize: "12px", color: "#94a3b8" }}>Kullanılan Algoritma</div>
                                 <div style={{ fontWeight: "bold" }}>{result.algorithmName}</div>
                             </div>
                             <div style={{ background: "rgba(0,0,0,0.4)", padding: "10px", borderRadius: "4px", border: "1px solid #334155", textAlign: "center" }}>
-                                <div style={{ fontSize: "12px", color: "#94a3b8" }}>Süre</div>
+                                <div style={{ fontSize: "12px", color: "#94a3b8" }}>Hesaplama Süresi</div>
                                 <div style={{ fontWeight: "bold" }}>{result.executionTime.toFixed(0)} ms</div>
                             </div>
                         </div>
@@ -586,7 +596,7 @@ const App: React.FC = () => {
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid #334155", paddingTop: "10px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "8px", background: "rgba(30,41,59,0.5)", borderRadius: "4px" }}>
-                            <span style={{ fontSize: "12px", color: "#94a3b8" }}>Gecikme (Delay)</span>
+                            <span style={{ fontSize: "12px", color: "#94a3b8" }}>Toplam Gecikme (Delay)</span>
                             <span style={{ fontFamily: "monospace", color: "#60a5fa" }}>{result.metrics.totalDelay.toFixed(2)} ms</span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", padding: "8px", background: "rgba(30,41,59,0.5)", borderRadius: "4px" }}>

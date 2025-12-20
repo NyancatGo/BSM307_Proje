@@ -3,12 +3,12 @@ import { GraphData, AlgorithmParams, PathResult, AlgorithmType } from '../types'
 // ============================================================================
 // 1. ORTAK HESAPLAMA MOTORU (FİZİK & MATEMATİK KATMANI)
 // ============================================================================
-// Tüm algoritmalar yolu bulur, ama maliyeti bu fonksiyon hesaplar.
-// Hoca sorarsa: "Hocam kod tekrarı olmasın diye maliyet hesabını ortak fonksiyona çektik" dersin.
+// Tüm algoritmalar yolu bulur, ancak maliyeti bu fonksiyon hesaplar.
+// Kod tekrarını önlemek için maliyet hesabı merkezi bir fonksiyona alınmıştır.
 
 const calculatePathMetrics = (path: number[], graph: GraphData) => {
     let totalDelay = 0;
-    let totalLogRel = 0; // Logaritmik Toplam (Çarpım yerine)
+    let totalLogRel = 0; // Logaritmik Toplam (Çarpım işlemini toplama dönüştürmek için)
     let totalResCost = 0;
     let rawReliability = 1.0;
 
@@ -16,25 +16,29 @@ const calculatePathMetrics = (path: number[], graph: GraphData) => {
         const u = path[i];
         const v = path[i + 1];
 
-        // Link ve Node bul
+        // İki düğüm arasındaki bağlantıyı (Link) ve hedef düğümü (Node) buluyoruz
         const link = graph.links.find(l => (l.source === u && l.target === v) || (l.source === v && l.target === u));
         const targetNode = graph.nodes.find(n => n.id === v);
 
         if (link && targetNode) {
-            // A) GECİKME (Delay): Link + Node İşlem Süresi
+            // A) GECİKME (Delay): Link İletim Süresi + Hedef Düğüm İşlem Süresi
+            // Toplam Gecikme = Σ (LinkDelay + NodeProcessingDelay)
             totalDelay += link.propagationDelay + (targetNode.processingDelay || 0);
 
             // B) GÜVENİLİRLİK (Reliability): Logaritmik Dönüşüm
-            // R_total = R1 * R2 * ... -> log(R_total) = log(R1) + log(R2)
-            // Biz maliyet hesabı yaptığımız için -log kullanıyoruz (Minimize etmek için)
+            // R_total = R1 * R2 * ... formülü çarpım gerektirir.
+            // Optimizasyon algoritmalarında toplama işlemi daha kararlı olduğu için logaritma kullanıyoruz:
+            // log(R_total) = log(R1) + log(R2)
+            // Maliyet hesabı yaptığımız için (minimize etmek istiyoruz), -log kullanıyoruz.
             const lRel = Math.max(0.0001, link.reliability || 0.99);
             const nRel = Math.max(0.0001, targetNode.reliability || 0.99);
 
             totalLogRel += (-Math.log(lRel)) + (-Math.log(nRel));
             rawReliability *= (lRel * nRel);
 
-            // C) KAYNAK (Resource): Bant Genişliği ile Ters Orantı
-            // Bant genişliği ne kadar büyükse maliyet o kadar az olsun.
+            // C) KAYNAK KULLANIMI (Resource Cost): Bant Genişliği ile Ters Orantılı
+            // Yüksek bant genişliğine sahip yolların maliyeti DÜŞÜK olmalıdır.
+            // Cost = 1 / Bandwidth (veya 1000 / Bandwidth ölçeklemesi ile)
             totalResCost += (1000 / (link.bandwidth || 100));
         }
     }
@@ -43,16 +47,17 @@ const calculatePathMetrics = (path: number[], graph: GraphData) => {
 };
 
 const calculateWeightedCost = (metrics: any, weights: AlgorithmParams) => {
-    // Kullanıcının Slider ile seçtiği ağırlıklar burada devreye girer
+    // Ağırlıklı Toplam Metodu (Weighted Sum Method)
+    // Kullanıcının arayüzden seçtiği ağırlıklara (wDelay, wReliability, wResource) göre skor üretilir.
+    // Formül: Cost = (w1 * Delay) + (w2 * ReliabilityCost) + (w3 * ResourceCost)
     return (
         ((weights.wDelay ?? 0.33) * metrics.totalDelay) +
         ((weights.wReliability ?? 0.33) * metrics.totalLogRel * 100) +
-        ((weights.wResource ?? 0.33) * metrics.resourceCost) +
-        (metrics.hopCount * 10)
+        ((weights.wResource ?? 0.33) * metrics.resourceCost)
     );
 };
 
-// Helper: 3D Distance
+// Yardımcı: 3D Uzaklık Hesaplama (Öklid Mesafesi)
 const getDistance = (n1: any, n2: any) => {
     return Math.sqrt(
         Math.pow((n1.x || 0) - (n2.x || 0), 2) +
@@ -62,6 +67,7 @@ const getDistance = (n1: any, n2: any) => {
 };
 
 // Yardımcı: Akıllı Komşu Seçici (Spatial Heuristic)
+// Rastgele seçim yerine, hedefe fiziksel olarak daha yakın olan komşuları tercih eder.
 const getSmartNeighbor = (currentId: number, targetId: number, graph: GraphData, visited: Set<number>): number | null => {
     const links = graph.links.filter(l => l.source === currentId || l.target === currentId);
 
@@ -72,45 +78,51 @@ const getSmartNeighbor = (currentId: number, targetId: number, graph: GraphData,
 
     if (candidates.length === 0) return null;
 
-    // Hedef node'u bul (Koordinatları için)
+    // Hedef düğümü bul (Koordinatları almak için)
     const targetNode = graph.nodes.find(n => n.id === targetId);
     if (!targetNode) return candidates[Math.floor(Math.random() * candidates.length)];
 
-    // Her adayın hedefe olan uzaklığını hesapla
+    // Her adayın hedefe olan 3D uzaklığını hesapla
     const scoredCandidates = candidates.map(id => {
         const node = graph.nodes.find(n => n.id === id);
         if (!node) return { id, dist: Infinity };
         return { id, dist: getDistance(node, targetNode) };
     });
 
-    // En yakın 3 komşuyu önceliklendir (Greedy + Randomness)
+    // En yakın komşuları sırala (Greedy Yaklaşım)
     scoredCandidates.sort((a, b) => a.dist - b.dist);
 
-    // Top %30'luk dilimden seç (Yoksa local minima'ya takılabilir)
+    // En iyi %30'luk dilimden rastgele birini seç (Local Minima tuzağından kaçmak için)
     const topCount = Math.max(1, Math.floor(scoredCandidates.length * 0.3));
-    const pool = scoredCandidates.slice(0, topCount + 1); // En iyi 1-2 tanesi
+    const pool = scoredCandidates.slice(0, topCount + 1);
 
     const chosen = pool[Math.floor(Math.random() * pool.length)];
     return chosen.id;
 };
 
 // ============================================================================
-// 2. GENETİK ALGORİTMA (GA) - DOĞAL SEÇİLİM
+// 2. GENETİK ALGORİTMA (GA) - DOĞAL SEÇİLİM SİMÜLASYONU
 // ============================================================================
-// Özellikleri: Crossover (Çaprazlama), Mutation (Mutasyon), Population (Popülasyon)
+// Temel Kavramlar:
+// - Kromozom: Bir çözüm yolu (Örn: [Start, A, B, End])
+// - Popülasyon: Çözüm yolları kümesi
+// - Fitness (Uygunluk): Yolun maliyeti (Düşük maliyet = Yüksek uygunluk)
+// - Crossover (Çaprazlama): İki iyi yoldan yeni bir yol üretme
+// - Mutation (Mutasyon): Yolda rastgele değişiklik yapma
 
 export const runGeneticAlgorithm = (graph: GraphData, start: number, end: number, weights: AlgorithmParams): PathResult => {
     const startTime = performance.now();
-    const POPULATION_SIZE = 30;  // ✅ Biraz artırdım
-    const GENERATIONS = 15;      // ✅ Biraz artırdım
+    const POPULATION_SIZE = 30;  // Popülasyon büyüklüğü
+    const GENERATIONS = 15;      // Nesil sayısı
     let population: number[][] = [];
 
-    // 1. Başlangıç Popülasyonunu Rastgele Oluştur
+    // 1. ADIM: Başlangıç Popülasyonunun Oluşturulması
     for (let i = 0; i < POPULATION_SIZE; i++) {
         let path = [start];
         let curr = start;
         let visited = new Set([start]);
 
+        // Rastgele (ama hedefe yönelimli) yollar oluştur
         for (let step = 0; step < 100; step++) {
             const next = getSmartNeighbor(curr, end, graph, visited);
             if (!next) break;
@@ -120,33 +132,32 @@ export const runGeneticAlgorithm = (graph: GraphData, start: number, end: number
             if (curr === end) break;
         }
 
-        // ✅ SADECE GEÇERLİ YOLLARI EKLE (hedefe ulaşanlar)
+        // Sadece hedefe ulaşabilen yolları popülasyona ekle
         if (path[path.length - 1] === end) {
             population.push(path);
         }
     }
 
-    // Eğer hiç yol bulamazsa basit bir tane üret
+    // Eğer hiç geçerli yol bulunamazsa, basit bir BFS/DFS benzeri yöntemle yol bul
     if (population.length === 0) {
-        // ✅ Basit yol bulma (BFS benzeri)
         const simplePath = findSimplePath(graph, start, end);
         population.push(simplePath);
     }
 
-    // 2. Nesiller Boyunca Evrimleştir
+    // 2. ADIM: Evrim Döngüsü (Generations)
     for (let gen = 0; gen < GENERATIONS; gen++) {
-        // Sırala (En iyi maliyet en üste)
+        // Popülasyonu maliyete göre sırala (En iyi yollar en başa)
         population.sort((a, b) => {
             const costA = calculateWeightedCost(calculatePathMetrics(a, graph), weights);
             const costB = calculateWeightedCost(calculatePathMetrics(b, graph), weights);
             return costA - costB;
         });
 
-        // En iyi %50'yi koru
+        // Doğal Seçilim: En iyi %50 hayatta kalır, diğerleri elenir
         const survivors = population.slice(0, Math.max(2, Math.floor(POPULATION_SIZE / 2)));
         const newGeneration = [...survivors];
 
-        // ✅ CROSSOVER (Çaprazlama) - İki ebeveynden çocuk üret
+        // Çaprazlama (Crossover): Hayatta kalanlardan yeni bireyler üret
         while (newGeneration.length < POPULATION_SIZE) {
             if (survivors.length >= 2) {
                 const parent1 = survivors[Math.floor(Math.random() * survivors.length)];
@@ -161,7 +172,7 @@ export const runGeneticAlgorithm = (graph: GraphData, start: number, end: number
             }
         }
 
-        // ✅ MUTATION (Mutasyon) - Bazı yolları değiştir
+        // Mutasyon (Mutation): Çeşitliliği artırmak için rastgele değişiklikler yap
         for (let i = 0; i < Math.floor(POPULATION_SIZE * 0.2); i++) {
             if (survivors.length > 0) {
                 const original = survivors[Math.floor(Math.random() * survivors.length)];
@@ -176,7 +187,7 @@ export const runGeneticAlgorithm = (graph: GraphData, start: number, end: number
         population = newGeneration.slice(0, POPULATION_SIZE);
     }
 
-    // En iyi yolu seç
+    // 3. ADIM: En İyi Çözümün Seçilmesi
     population.sort((a, b) => {
         const costA = calculateWeightedCost(calculatePathMetrics(a, graph), weights);
         const costB = calculateWeightedCost(calculatePathMetrics(b, graph), weights);
@@ -188,36 +199,35 @@ export const runGeneticAlgorithm = (graph: GraphData, start: number, end: number
 
     return {
         path: bestPath,
-        algorithmName: "Genetic Algorithm",
+        algorithmName: "Genetik Algoritma (GA)",
         executionTime: performance.now() - startTime,
         metrics: { ...metrics, weightedCost: calculateWeightedCost(metrics, weights) }
     };
 };
 
-// ✅ YENİ: Crossover Fonksiyonu
+// YARDIMCI: Crossover (Çaprazlama) Fonksiyonu
 function crossover(parent1: number[], parent2: number[], graph: GraphData, start: number, end: number): number[] | null {
-    // İki ebeveynin ortak noktasını bul ve birleştir
+    // İki yolun ortak noktalarını bul
     const commonNodes = parent1.filter(node => parent2.includes(node));
 
     if (commonNodes.length < 2) return null;
 
-    // Ortak bir nokta seç (start ve end hariç)
+    // Start ve End haricinde bir kesişim noktası seç
     const validCommon = commonNodes.filter(n => n !== start && n !== end);
-    if (validCommon.length === 0) return parent1; // Fallback
+    if (validCommon.length === 0) return parent1;
 
     const crossPoint = validCommon[Math.floor(Math.random() * validCommon.length)];
 
-    // Parent1'den crossPoint'e kadar al
+    // Parent1'in baş tarafı ile Parent2'nin son tarafını birleştir
     const idx1 = parent1.indexOf(crossPoint);
     const part1 = parent1.slice(0, idx1 + 1);
 
-    // Parent2'den crossPoint'ten end'e kadar al
     const idx2 = parent2.indexOf(crossPoint);
     const part2 = parent2.slice(idx2);
 
     const child = [...part1, ...part2];
 
-    // Tekrar eden node'ları temizle
+    // Döngüleri (Loops) temizle
     const uniquePath: number[] = [];
     const seen = new Set<number>();
 
@@ -231,18 +241,18 @@ function crossover(parent1: number[], parent2: number[], graph: GraphData, start
     return uniquePath;
 }
 
-// ✅ YENİ: Mutation Fonksiyonu (Düzgün)
+// YARDIMCI: Mutasyon Fonksiyonu
 function mutate(path: number[], graph: GraphData, end: number): number[] | null {
     if (path.length < 3) return path;
 
-    // Yolun ortasından bir nokta seç ve oradan sonrasını yeniden oluştur
+    // Yolun ortasından rastgele bir nokta seç ve o noktadan sonrasını kopart
     const cutIdx = Math.floor(Math.random() * (path.length - 2)) + 1;
     const mutated = path.slice(0, cutIdx);
 
     let curr = mutated[mutated.length - 1];
     const visited = new Set(mutated);
 
-    // ✅ Kesilen noktadan hedefe kadar YENİ yol bul
+    // Koparılan noktadan hedefe giden YENİ bir yol bulmaya çalış
     for (let step = 0; step < 50; step++) {
         if (curr === end) break;
 
@@ -257,7 +267,7 @@ function mutate(path: number[], graph: GraphData, end: number): number[] | null 
     return mutated[mutated.length - 1] === end ? mutated : null;
 }
 
-// ✅ YENİ: Basit Yol Bulma (BFS benzeri)
+// YARDIMCI: Basit Yol Bulucu (Yedek Plan)
 function findSimplePath(graph: GraphData, start: number, end: number): number[] {
     const queue: { node: number; path: number[] }[] = [{ node: start, path: [start] }];
     const visited = new Set<number>([start]);
@@ -282,23 +292,25 @@ function findSimplePath(graph: GraphData, start: number, end: number): number[] 
             });
         }
     }
-
     // Yol bulunamazsa direkt git (son çare)
     return [start, end];
 }
 
 
 // ============================================================================
-// 3. ANT COLONY OPTIMIZATION (ACO) - KARINCA KOLONİSİ
+// 3. ANT COLONY OPTIMIZATION (ACO) - KARINCA KOLONİSİ ALGORİTMASI
 // ============================================================================
-// Özellikleri: Feromon (Pheromone), Olasılıksal Seçim (Probabilistic Choice)
+// Temel Kavramlar:
+// - Feromon (Pheromone): Karıncaların geçtiği yollara bıraktığı kimyasal iz.
+// - Buharlaşma (Evaporation): Kullanılmayan yollardaki izlerin zamanla silinmesi.
+// - Olasılıksal Seçim: Karıncalar yoğun feromonlu yolları daha yüksek ihtimalle seçer.
 
 export const runACO = (graph: GraphData, start: number, end: number, weights: AlgorithmParams): PathResult => {
     const startTime = performance.now();
-    const ANT_COUNT = 15;
-    const ITERATIONS = 5;
+    const ANT_COUNT = 15; // Simülasyondaki karınca sayısı
+    const ITERATIONS = 5; // Döngü sayısı
 
-    // Feromon Haritası (Her yolun bir kokusu var)
+    // Feromon Haritası: Her kenarın (Link) ne kadar çekici olduğunu tutar
     const pheromones = new Map<string, number>();
     const getPheromone = (u: number, v: number) => pheromones.get(`${Math.min(u, v)}-${Math.max(u, v)}`) || 1.0;
     const updatePheromone = (u: number, v: number, amount: number) => {
@@ -315,7 +327,7 @@ export const runACO = (graph: GraphData, start: number, end: number, weights: Al
             let path = [current];
             let visited = new Set([current]);
 
-            // Karınca yol arıyor
+            // Karınca adım adım ilerliyor
             while (current !== end && path.length < 100) {
                 const neighbors = graph.links
                     .filter(l => (l.source === current && !visited.has(l.target)) || (l.target === current && !visited.has(l.source)))
@@ -323,20 +335,20 @@ export const runACO = (graph: GraphData, start: number, end: number, weights: Al
 
                 if (neighbors.length === 0) break;
 
-                // Olasılık Hesabı: (Feromon ^ alpha) * (1/Maliyet ^ beta)
-                // Burada basitleştirilmiş rulet tekerleği seçimi yapıyoruz
+                // Rulet Tekerleği Seçimi (Roulette Wheel Selection)
+                // Olasılık = Feromon Miktarı * Hevristik Bilgi
                 let rouletteWheel: { node: number, prob: number }[] = [];
                 let totalProb = 0;
 
                 neighbors.forEach(n => {
                     const ph = getPheromone(current, n);
-                    // Hoca sorarsa: "Heuristic olarak mesafeyi değil, link kapasitesini kullandık"
+                    // Feromonun etkisi. Mesafeye göre olasılığı artırıyoruz.
                     const prob = ph * 1.5;
                     rouletteWheel.push({ node: n, prob });
                     totalProb += prob;
                 });
 
-                // Rastgele Seçim
+                // Rastgele bir sonraki durağı seç
                 const rand = Math.random() * totalProb;
                 let sum = 0;
                 let chosenNode = neighbors[0];
@@ -371,7 +383,7 @@ export const runACO = (graph: GraphData, start: number, end: number, weights: Al
     const finalMetrics = calculatePathMetrics(bestGlobalPath, graph);
     return {
         path: bestGlobalPath,
-        algorithmName: "Ant Colony Opt.",
+        algorithmName: "Karınca Kolonisi (ACO)",
         executionTime: performance.now() - startTime,
         metrics: { ...finalMetrics, weightedCost: bestGlobalCost }
     };
@@ -379,9 +391,12 @@ export const runACO = (graph: GraphData, start: number, end: number, weights: Al
 
 
 // ============================================================================
-// 4. ARTIFICIAL BEE COLONY (ABC) - ARI KOLONİSİ
+// 4. ARTIFICIAL BEE COLONY (ABC) - YAPAY ARI KOLONİSİ
 // ============================================================================
-// Özellikleri: İşçi Arılar (Employed), Gözcü Arılar (Onlooker), Kaşif Arılar (Scout)
+// Temel Kavramlar:
+// - İşçi Arılar (Employed): Bilinen besin kaynaklarını sömürür.
+// - Gözcü Arılar (Onlooker): İyi kaynakları seçerek sömürür.
+// - Kaşif Arılar (Scout): Yeni kaynaklar arar.
 
 export const runABC = (graph: GraphData, start: number, end: number, weights: AlgorithmParams): PathResult => {
     const startTime = performance.now();
@@ -424,7 +439,7 @@ export const runABC = (graph: GraphData, start: number, end: number, weights: Al
     const metrics = calculatePathMetrics(bestSource, graph);
     return {
         path: bestSource,
-        algorithmName: "Artificial Bee Colony",
+        algorithmName: "Yapay Arı Kolonisi (ABC)",
         executionTime: performance.now() - startTime,
         metrics: { ...metrics, weightedCost: minCost }
     };
@@ -525,7 +540,7 @@ export const runQLearning = (graph: GraphData, start: number, end: number, weigh
     const metrics = calculatePathMetrics(finalPath, graph);
     return {
         path: finalPath,
-        algorithmName: "Q-Learning (RL)",
+        algorithmName: "Q-Learning (Pekiştirmeli Öğrenme)",
         executionTime: performance.now() - startTime,
         metrics: { ...metrics, weightedCost: calculateWeightedCost(metrics, weights) }
     };

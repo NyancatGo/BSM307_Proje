@@ -6,21 +6,23 @@ interface ExperimentRunnerProps {
     graph: GraphData;
 }
 
+// Deney Sonucu Veri Modeli
 interface TestResult {
-    testCase: number;
-    s: number;
-    d: number;
-    b: number;
-    algorithm: string;
-    successRate: number;
-    avgCost: number | string;
-    stdDev: number | string;
-    bestCost: number | string;
-    worstCost: number | string;
-    avgRuntime: number;
+    testCase: number;      // Senaryo No
+    s: number;             // Başlangıç Düğümü
+    d: number;             // Hedef Düğümü
+    b: number;             // İstenen Bant Genişliği
+    algorithm: string;     // Algoritma Adı
+    successRate: number;   // Başarım Oranı (5 tekrarda kaçı başarılı)
+    avgCost: number | string; // Ortalama Maliyet
+    stdDev: number | string;  // Standart Sapma
+    bestCost: number | string; // En İyi Maliyet
+    worstCost: number | string; // En Kötü Maliyet
+    avgRuntime: number;    // Ortalama Çalışma Süresi (ms)
 }
 
-// Helper to filter graph by bandwidth
+// Yardımcı: Grafiği belirli bir bant genişliğine göre filtreler
+// Proje İsteri: Eğer bir linkin kapasitesi yetersizse, o link kullanılamaz.
 const filterGraphByBandwidth = (graph: GraphData, minBw: number): GraphData => {
     const filteredLinks = graph.links.filter(l => l.bandwidth >= minBw);
     const adjacency = new Map<number, Link[]>();
@@ -29,17 +31,7 @@ const filterGraphByBandwidth = (graph: GraphData, minBw: number): GraphData => {
         if (!adjacency.has(link.source)) adjacency.set(link.source, []);
         adjacency.get(link.source)!.push(link);
 
-        // Undirected graph assumption from App.tsx logic (though links might be directed in source, App.tsx duplicates them)
-        // App.tsx does:
-        // if (!adjacency.has(link.target)) adjacency.set(link.target, []);
-        // adjacency.get(link.target)!.push({ ...link, source: link.target, target: link.source });
-        // So we should do the same if the original graph links are just one-way in definition but treated as two-way.
-        // However, graph.links usually contains all edges.
-        // Let's rely on cleaning the adjacency map.
-
-        // NOTE: App.tsx builds adjacency manually. Here `graph` passed from App already has adjacency.
-        // But we need a NEW adjacency map for the filtered graph.
-        // We should safely replicate the logic:
+        // Çift yönlü bağlantı kabulü (Undirected Graph)
         if (!adjacency.has(link.target)) adjacency.set(link.target, []);
         adjacency.get(link.target)!.push({ ...link, source: link.target, target: link.source });
     });
@@ -67,7 +59,7 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
         wDelay: 0.34,
         wReliability: 0.33,
         wResource: 0.33,
-        // Default params for algos
+        // Varsayılan parametreler
         populationSize: 50,
         iterations: 50,
         ants: 20,
@@ -79,20 +71,16 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
     const runExperiments = async () => {
         setRunning(true);
         setResults([]);
-        setLogs(['Starting experiments...']);
+        setLogs(['Deneyler başlatılıyor...']);
 
-        // Use setTimeout to allow UI to render (break up the event loop)
+        // UI'ın donmaması için asenkron gecikme ekliyoruz
         setTimeout(async () => {
             const tempResults: TestResult[] = [];
             const N = graph.nodes.length;
 
-            // Seed random for reproducibility (simple approach: just math.random for now, 
-            // but if we wanted strict seed we'd need a custom rand function. 
-            // User asked for "20 random instances", standard Math.random is fine.)
-
+            // Proje İsteri: 20 farklı (Source, Destination, Bandwidth) senaryosu
             for (let i = 0; i < 20; i++) {
-                // Generate random S, D, B
-                // Ensure S != D
+                // Rastgele S ve D seçimi
                 let s = Math.floor(Math.random() * N);
                 let d = Math.floor(Math.random() * N);
                 while (d === s || graph.nodes[s] === undefined || graph.nodes[d] === undefined) {
@@ -100,11 +88,12 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
                     d = Math.floor(Math.random() * N);
                 }
 
-                // Random Bandwidth between 100 and 1000 Mbps
+                // Rastgele Bant Genişliği İsteği [100 - 1000 Mbps arası]
                 const b = Math.floor(Math.random() * 900) + 100;
 
-                addLog(`Test Case ${i + 1}: Node ${s} -> ${d}, BW ${b} Mbps`);
+                addLog(`Senaryo ${i + 1}: Node ${s} -> ${d}, Bant Genişliği: ${b} Mbps`);
 
+                // Kapasite kısıtına göre grafiği daralt
                 const filteredGraph = filterGraphByBandwidth(graph, b);
 
                 for (const alg of algorithms) {
@@ -112,6 +101,7 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
                     const runtimes: number[] = [];
                     let successes = 0;
 
+                    // Proje İsteri: Her senaryo 5 kez tekrar edilecek (Average, StdDev hesabı için)
                     for (let rep = 0; rep < 5; rep++) {
                         const startT = performance.now();
                         let res;
@@ -126,9 +116,10 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
                         }
                         const endT = performance.now();
 
+                        // Başarım Kontrolü: Yol bulundu mu ve geçerli mi?
                         if (res.path && res.path.length > 0) {
                             if (res.metrics.weightedCost === Infinity) {
-                                // Fail
+                                // Başarısız
                             } else {
                                 costs.push(res.metrics.weightedCost);
                                 successes++;
@@ -136,10 +127,11 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
                         }
                         runtimes.push(endT - startT);
 
-                        // Yield to UI every few iterations
+                        // UI'a nefes aldır
                         if (rep % 5 === 0) await new Promise(r => setTimeout(r, 0));
                     }
 
+                    // İstatistik Hesaplama
                     const avgCost = costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : Infinity;
                     const stdDev = costs.length ? Math.sqrt(costs.map(x => (x - avgCost) ** 2).reduce((a, b) => a + b, 0) / costs.length) : Infinity;
                     const best = costs.length ? Math.min(...costs) : Infinity;
@@ -153,10 +145,10 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
                         b,
                         algorithm: alg.name,
                         successRate: successes / 5,
-                        avgCost: avgCost === Infinity ? 'Inf' : avgCost,
-                        stdDev: stdDev === Infinity ? 'Inf' : stdDev,
-                        bestCost: best === Infinity ? 'Inf' : best,
-                        worstCost: worst === Infinity ? 'Inf' : worst,
+                        avgCost: avgCost === Infinity ? 'Başarısız' : avgCost,
+                        stdDev: stdDev === Infinity ? '-' : stdDev,
+                        bestCost: best === Infinity ? '-' : best,
+                        worstCost: worst === Infinity ? '-' : worst,
                         avgRuntime
                     });
                 }
@@ -164,13 +156,12 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
 
             setResults(tempResults);
             setRunning(false);
-            addLog('Experiments completed.');
+            addLog('Deneyler tamamlandı.');
         }, 100);
     };
 
     const downloadCSV = () => {
-        // Simple CSV generator
-        const header = ['Test Case', 'S', 'D', 'B (Mbps)', 'Algorithm', 'Success Rate', 'Avg Cost', 'Std Dev', 'Best Cost', 'Worst Cost', 'Avg Runtime (ms)'];
+        const header = ['Senaryo', 'Baslangic (S)', 'Hedef (D)', 'Bant Gen (Mbps)', 'Algoritma', 'Basarim Orani', 'Ort. Maliyet', 'Std. Sapma', 'En Iyi', 'En Kotu', 'Ort. Sure (ms)'];
         const rows = results.map(r => [
             r.testCase, r.s, r.d, r.b.toFixed(2), r.algorithm,
             r.successRate.toFixed(2),
@@ -181,22 +172,22 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
             r.avgRuntime.toFixed(4)
         ].join(','));
 
-        const csvContent = [header.join(','), ...rows].join('\\n');
+        const csvContent = [header.join(','), ...rows].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'experiment_results.csv';
+        link.download = 'deney_sonuclari.csv';
         link.click();
     };
 
     const copyMarkdown = () => {
-        const header = '| Test Case | S | D | B (Mbps) | Algorithm | Success Rate | Avg Cost | Std Dev | Best Cost | Worst Cost | Avg Runtime (ms) |';
+        const header = '| Senaryo | S | D | BW (Mbps) | Algoritma | Başarım | Ort. Maliyet | Std. Sapma | En İyi | En Kötü | Süre (ms) |';
         const sep = '|---|---|---|---|---|---|---|---|---|---|---|';
         const rows = results.map(r => `| ${r.testCase} | ${r.s} | ${r.d} | ${r.b.toFixed(2)} | ${r.algorithm} | ${r.successRate.toFixed(2)} | ${typeof r.avgCost === 'number' ? r.avgCost.toFixed(2) : r.avgCost} | ${typeof r.stdDev === 'number' ? r.stdDev.toFixed(2) : r.stdDev} | ${typeof r.bestCost === 'number' ? r.bestCost.toFixed(2) : r.bestCost} | ${typeof r.worstCost === 'number' ? r.worstCost.toFixed(2) : r.worstCost} | ${r.avgRuntime.toFixed(4)} |`);
 
-        const md = [header, sep, ...rows].join('\\n');
+        const md = [header, sep, ...rows].join('\n');
         navigator.clipboard.writeText(md);
-        alert('Markdown table copied to clipboard!');
+        alert('Markdown tablosu kopyalandı! Raporuna yapıştırabilirsin.');
     };
 
     return (
@@ -217,19 +208,19 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
             boxShadow: '0 0 20px rgba(0,0,0,0.5)'
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#facc15' }}>Experimental Results Runner</h2>
+                <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#facc15' }}>Otomatik Deney Çalıştırıcısı (20+ Senaryo)</h2>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button
                         onClick={runExperiments}
                         disabled={running}
                         style={{ padding: '8px 16px', background: running ? '#475569' : '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: running ? 'default' : 'pointer' }}
                     >
-                        {running ? 'Running...' : 'Run Experiments'}
+                        {running ? 'Çalışıyor...' : 'Deneyleri Başlat'}
                     </button>
                     {results.length > 0 && (
                         <>
-                            <button onClick={downloadCSV} style={{ padding: '8px 16px', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Download CSV</button>
-                            <button onClick={copyMarkdown} style={{ padding: '8px 16px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Copy Markdown</button>
+                            <button onClick={downloadCSV} style={{ padding: '8px 16px', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>CSV İndir (Excel)</button>
+                            <button onClick={copyMarkdown} style={{ padding: '8px 16px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Tabloyu Kopyala (Rapor İçin)</button>
                         </>
                     )}
                 </div>
@@ -245,17 +236,17 @@ const ExperimentRunner: React.FC<ExperimentRunnerProps> = ({ graph }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
                         <tr style={{ background: '#0f172a', textAlign: 'left' }}>
-                            <th style={{ padding: '8px' }}>Case</th>
+                            <th style={{ padding: '8px' }}>No</th>
                             <th style={{ padding: '8px' }}>S</th>
                             <th style={{ padding: '8px' }}>D</th>
-                            <th style={{ padding: '8px' }}>B (Mbps)</th>
-                            <th style={{ padding: '8px' }}>Alg</th>
-                            <th style={{ padding: '8px' }}>Success</th>
-                            <th style={{ padding: '8px' }}>Avg Cost</th>
-                            <th style={{ padding: '8px' }}>Std Dev</th>
-                            <th style={{ padding: '8px' }}>Best</th>
-                            <th style={{ padding: '8px' }}>Worst</th>
-                            <th style={{ padding: '8px' }}>Time (ms)</th>
+                            <th style={{ padding: '8px' }}>Bant Gen.</th>
+                            <th style={{ padding: '8px' }}>Algoritma</th>
+                            <th style={{ padding: '8px' }}>Başarım</th>
+                            <th style={{ padding: '8px' }}>Ort. Maliyet</th>
+                            <th style={{ padding: '8px' }}>Std. Sapma</th>
+                            <th style={{ padding: '8px' }}>En İyi</th>
+                            <th style={{ padding: '8px' }}>En Kötü</th>
+                            <th style={{ padding: '8px' }}>Süre (ms)</th>
                         </tr>
                     </thead>
                     <tbody>
