@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import WorldMap from "./components/WorldMap";
+import ExperimentRunner from "./components/ExperimentRunner";
 import { AlgorithmType, GraphData, ResultType } from "./types";
 import { runABC, runACO, runGeneticAlgorithm, runQLearning } from "./services/algorithms";
 import {
@@ -46,6 +47,7 @@ const App: React.FC = () => {
     const [resultsOpen, setResultsOpen] = useState(true);
 
     const [showComparison, setShowComparison] = useState(false);
+    const [showTesting, setShowTesting] = useState(false);
     const [comparisonData, setComparisonData] = useState<any[]>([]);
 
     useEffect(() => {
@@ -504,10 +506,33 @@ const App: React.FC = () => {
                             >
                                 <ChartBarIcon style={{ width: "20px", color: "#facc15" }} /> Tümünü Kıyasla
                             </button>
+
+                            <button
+                                onClick={() => setShowTesting(!showTesting)}
+                                style={{
+                                    width: "100%",
+                                    backgroundColor: showTesting ? "#dc2626" : "#7c3aed",
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    padding: "10px",
+                                    borderRadius: "4px",
+                                    border: "1px solid #475569",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    gap: "8px"
+                                }}
+                            >
+                                <AdjustmentsHorizontalIcon style={{ width: "20px" }} /> {showTesting ? "Testleri Kapat" : "Test Runner (20+ Cases)"}
+                            </button>
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* EXPERIMENT RUNNER */}
+            {showTesting && graph && <ExperimentRunner graph={graph} />}
 
             {/* RESULTS PANEL */}
             {result && resultsOpen && (
