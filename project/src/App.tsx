@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import DunyaHaritasi from "./components/DunyaHaritasi";
 import DeneyYurutucu from "./components/DeneyYurutucu";
 import { AlgoritmaTipi, CizgeVerisi, YolSonucu, Baglanti } from "./tipler";
-import { yapayAriKolonisiCalistir, karincaKolonisiCalistir, genetikAlgoritmayiCalistir, pekisirmeliOgrenmeCalistir } from "./services/algoritmalar";
+// import { yapayAriKolonisiCalistir, karincaKolonisiCalistir, genetikAlgoritmayiCalistir, pekisirmeliOgrenmeCalistir } from "./services/algoritmalar";
 import {
     AdjustmentsHorizontalIcon,
     ChartBarIcon,
@@ -188,112 +188,103 @@ const App: React.FC = () => {
     };
 
     // Seçilen Algoritmayı Çalıştır
-    const algoritmaIleHesapla = (algo: AlgoritmaTipi, g: CizgeVerisi, src: number, dst: number, w: Agirliklar) => {
-        let sonuc: any;
-        let isim = "Bilinmiyor";
+    // Web Worker ile Hesaplama (Promise Wrapper)
+    const calistirWorker = (algo: AlgoritmaTipi, g: CizgeVerisi, src: number, dst: number, w: Agirliklar): Promise<any> => {
+        return new Promise((resolve, reject) => {
+            // Webpack 5 / CRA 5 Compatible Worker Instantiation
+            const worker = new Worker(new URL('./services/hesaplama.worker.ts', import.meta.url));
 
-        if (algo === AlgoritmaTipi.GENETIC) {
-            sonuc = genetikAlgoritmayiCalistir(g, src, dst, w);
-            isim = "Genetik Algoritma (GA)";
-        } else if (algo === AlgoritmaTipi.ACO) {
-            sonuc = karincaKolonisiCalistir(g, src, dst, w);
-            isim = "Karınca Kolonisi (ACO)";
-        } else if (algo === AlgoritmaTipi.Q_LEARNING) {
-            sonuc = pekisirmeliOgrenmeCalistir(g, src, dst, w);
-            isim = "Q-Learning (Pekiştirmeli Öğrenme)";
-        } else if (algo === AlgoritmaTipi.ABC) {
-            sonuc = yapayAriKolonisiCalistir(g, src, dst, w);
-            isim = "Yapay Arı Kolonisi (ABC)";
-        } else {
-            return {
-                path: [],
-                metrics: { totalDelay: 0, totalReliability: 0, resourceCost: 0, weightedCost: 0 },
-                executionTime: 0,
-                algorithmName: "Bilinmiyor"
-            } as YolSonucu;
-        }
-
-        return { ...sonuc, algorithmName: isim };
+            worker.onmessage = (e: MessageEvent) => {
+                const { success, data, error } = e.data;
+                if (success) resolve(data);
+                else reject(error);
+                worker.terminate();
+            };
+            worker.onerror = (err: any) => {
+                reject(err);
+                worker.terminate();
+            };
+            worker.postMessage({ algo, cizge: g, src, dst, params: w });
+        });
     };
 
     // "Hesapla" Butonu Tetikleyicisi
-    const hesaplaButonunaBasildi = () => {
+    const hesaplaButonunaBasildi = async () => {
         if (!graf) return;
         setHesaplamaYapiyor(true);
 
-        window.setTimeout(() => {
-            // Filtrelenmiş Graf Üzerinde Çalış
-            const aktifGraf = grafiFiltrele(graf, minBantGenisligi);
-            const sonuc = algoritmaIleHesapla(seciliAlgoritma, aktifGraf, baslangicDugum, bitisDugum, agirliklar);
-            setSonuc(sonuc);
+        // Kısa bir gecikme UI'ın donmasını engellemek için (Render cycle)
+        await new Promise(r => setTimeout(r, 50));
 
+        const aktifGraf = grafiFiltrele(graf, minBantGenisligi);
+        try {
+            const sonuc = await calistirWorker(seciliAlgoritma, aktifGraf, baslangicDugum, bitisDugum, agirliklar);
+            setSonuc(sonuc);
             setKiyaslamaGoster(false);
             setSonuclarAcik(true);
+        } catch (e) {
+            console.error("Hesaplama Hatası:", e);
+            alert("Bir hata oluştu: " + e);
+        } finally {
             setHesaplamaYapiyor(false);
-        }, 300);
+        }
     };
 
     // "Tümünü Kıyasla" Butonu Tetikleyicisi
-    const kiyaslaButonunaBasildi = () => {
+    const kiyaslaButonunaBasildi = async () => {
         if (!graf) return;
         setHesaplamaYapiyor(true);
 
-        window.setTimeout(() => {
-            const aktifGraf = grafiFiltrele(graf, minBantGenisligi);
-            const algoritmalar: AlgoritmaTipi[] = [
-                AlgoritmaTipi.GENETIC,
-                AlgoritmaTipi.ACO,
-                AlgoritmaTipi.Q_LEARNING,
-                AlgoritmaTipi.ABC
-            ];
+        await new Promise(r => setTimeout(r, 50));
 
-            const iterasyon = 5; // Stabil sonuç için 5 tekrar
-            const ortalamaSonuclar = algoritmalar.map((algo) => {
-                let minMaliyet = Infinity;
-                let enIyiKosum: YolSonucu | null = null;
+        const aktifGraf = grafiFiltrele(graf, minBantGenisligi);
+        const algoritmalar: AlgoritmaTipi[] = [
+            AlgoritmaTipi.GENETIC,
+            AlgoritmaTipi.ACO,
+            AlgoritmaTipi.Q_LEARNING,
+            AlgoritmaTipi.ABC
+        ];
 
-                for (let i = 0; i < iterasyon; i++) {
-                    const res = algoritmaIleHesapla(algo, aktifGraf, baslangicDugum, bitisDugum, agirliklar);
-                    const c = res.metrics.weightedCost;
+        try {
+            // Paralel Çalıştırma! (Web Workers sayesinde)
+            const sonuclar = await Promise.all(
+                algoritmalar.map(async (algo) => {
+                    // Daha mantıklı paralellik: Her algoritma tek bir worker'da çalışsın.
+                    // 3 kere çalıştırıp en iyisini seçmek yerine, algoritma içindeki iterasyon sayısını artırabiliriz.
+                    // Burada thread sayısını düşürmek için tek seferlik koşum yapıyoruz.
+                    const enIyi = await calistirWorker(algo, aktifGraf, baslangicDugum, bitisDugum, agirliklar);
 
-                    if (c < minMaliyet) {
-                        minMaliyet = c;
-                        enIyiKosum = res;
-                    }
-                }
+                    let kisaAd = "??";
+                    if (algo === AlgoritmaTipi.GENETIC) kisaAd = "GA";
+                    else if (algo === AlgoritmaTipi.ACO) kisaAd = "ACO";
+                    else if (algo === AlgoritmaTipi.Q_LEARNING) kisaAd = "RL";
+                    else if (algo === AlgoritmaTipi.ABC) kisaAd = "ABC";
 
-                let kisaAd = "??";
-                if (algo === AlgoritmaTipi.GENETIC) kisaAd = "GA";
-                else if (algo === AlgoritmaTipi.ACO) kisaAd = "ACO";
-                else if (algo === AlgoritmaTipi.Q_LEARNING) kisaAd = "RL"; // Q-Learning -> RL
-                else if (algo === AlgoritmaTipi.ABC) kisaAd = "ABC";
+                    return {
+                        name: kisaAd,
+                        fullName: enIyi.algorithmName,
+                        res: enIyi,
+                        cost: enIyi.metrics.weightedCost,
+                        color:
+                            algo === AlgoritmaTipi.GENETIC ? "#facc15" :
+                                algo === AlgoritmaTipi.ACO ? "#ef4444" :
+                                    algo === AlgoritmaTipi.Q_LEARNING ? "#a855f7" : "#3b82f6"
+                    };
+                })
+            );
 
-                return {
-                    name: kisaAd, // Grafik için kısa isim
-                    fullName: enIyiKosum?.algorithmName || algo, // Tooltip için uzun isim
-                    res: enIyiKosum!,
-                    cost: enIyiKosum!.metrics.weightedCost,
-                    color:
-                        algo === AlgoritmaTipi.GENETIC
-                            ? "#facc15" // Yellow
-                            : algo === AlgoritmaTipi.ACO
-                                ? "#ef4444" // Red
-                                : algo === AlgoritmaTipi.Q_LEARNING
-                                    ? "#a855f7" // Purple
-                                    : "#3b82f6" // Blue
-                };
-            });
+            sonuclar.sort((a, b) => a.cost - b.cost);
+            setKiyaslamaVerisi(sonuclar);
 
-            // En düşük maliyetli algoritma en üstte olsun
-            ortalamaSonuclar.sort((a, b) => a.cost - b.cost);
-            setKiyaslamaVerisi(ortalamaSonuclar);
-
-            if (ortalamaSonuclar[0].res) setSonuc(ortalamaSonuclar[0].res);
+            if (sonuclar[0].res) setSonuc(sonuclar[0].res);
 
             setKiyaslamaGoster(true);
             setSonuclarAcik(true);
+        } catch (e) {
+            console.error("Kyaslama Hatası:", e);
+        } finally {
             setHesaplamaYapiyor(false);
-        }, 1000);
+        }
     };
 
     // Ağırlık Slider Kontrolü

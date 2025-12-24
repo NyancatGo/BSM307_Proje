@@ -1,9 +1,10 @@
-# 🌐 QoS Odaklı Akıllı Rotalama ve Web Simülasyonu (BSM307)
+# 🌐 QoS Odaklı Akıllı Rotalama ve 3D Web Simülasyonu (BSM307)
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=flat&logo=python)
-![Flask](https://img.shields.io/badge/Web-Flask-green?style=flat&logo=flask)
-![License](https://img.shields.io/badge/Course-BSM307-orange)
-![Status](https://img.shields.io/badge/Status-Completed-success)
+![React](https://img.shields.io/badge/Frontend-React-blue?style=flat&logo=react)
+![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?style=flat&logo=typescript)
+![Three.js](https://img.shields.io/badge/3D-Three.js-white?style=flat&logo=three.js)
+![Vite](https://img.shields.io/badge/Build-Vite-purple?style=flat&logo=vite)
+![Status](https://img.shields.io/badge/Status-Active-success)
 
 **Ders:** BSM307 - Bilgisayar Ağları (Güz 2025)  
 **Proje Konusu:** QoS Odaklı Çok Amaçlı Rotalama için Meta-Sezgisel ve Pekiştirmeli Öğrenme Yaklaşımları
@@ -11,20 +12,20 @@
 ---
 
 ## 📖 1. Proje Özeti
-Bu proje, modern veri merkezi ve bulut ağlarında (Cloud/Data Center) karşılaşılan **Rotalama (Routing)** problemini çözmek için geliştirilmiş yapay zeka tabanlı bir simülasyondur. 
+Bu proje, modern ağlarda (Cloud/Data Center) karşılaşılan **Rotalama (Routing)** problemini çözmek için geliştirilmiş, **React ve Three.js** tabanlı etkileşimli bir simülasyondur.
 
-250 düğümlü (veya ölçeklenebilir 1000+ düğümlü) karmaşık ve stokastik bir ağ üzerinde, veriyi **A noktasından B noktasına** götürecek en optimum yolu bulur. Klasik algoritmaların yetersiz kaldığı çok değişkenli senaryolarda, 4 farklı yapay zeka algoritmasını yarıştırır.
+Üç boyutlu bir dünya haritası üzerinde görselleştirilen 250+ düğümlü karmaşık ağ yapısında, veriyi **A noktasından B noktasına** götürecek en optimum yolu bulur. Klasik algoritmaların (Dijkstra gibi) yetersiz kalabildiği çok değişkenli (Gecikme, Güvenilirlik, Maliyet) senaryolarda, 4 farklı yapay zeka algoritmasını yarıştırır.
 
-### 🎯 Optimizasyon Hedefleri (QoS Metrikleri)
-Sistem, bir yol seçerken şu 3 çelişen metriği aynı anda optimize eder (Multi-Objective Optimization):
-1.  **⚡ Gecikme (Delay):** Verinin iletim süresini minimize eder (Minimizasyon).
-2.  **🛡️ Güvenilirlik (Reliability):** Yolun kopma ihtimalini en aza indirir (Maksimizasyon).
-3.  **🛣️ Kaynak Kullanımı (Resource):** Bant genişliği darboğazlarını engeller (Minimizasyon).
+### � Temel Özellikler
+*   **🌍 3D İnteraktif Görselleştirme:** Dünya küresi üzerinde düğümler, bağlantılar ve aktif rotayı "X-Ray" teknolojisiyle (dünyanın arkasından bile) görüntüleme.
+*   **⚡ Gerçek Zamanlı Simülasyon:** Algoritmaların çalışma süreçlerini ve sonuçlarını anlık izleme.
+*   **� Detaylı Analiz Modülü:** Başarı oranı, ortalama maliyet, çalışma süresi gibi metriklerle algoritmaları kıyaslayan "Deney Yürütücü".
+*   **�️ Esnek Ayarlar:** Gecikme, güvenilirlik ve maliyet ağırlıklarını (QoS) kaydırıcılarla dinamik olarak değiştirme.
 
 ---
 
 ## 🧠 2. Kullanılan Yapay Zeka Algoritmaları
-Proje kapsamında, problemin çözümü için **4 farklı modern yaklaşım** geliştirilmiş ve performansları kıyaslanmıştır:
+Proje kapsamında, problemin çözümü için **4 farklı modern yaklaşım** TypeScript ile sıfırdan implemente edilmiştir:
 
 | Algoritma | Tür | Açıklama |
 |-----------|-----|----------|
@@ -35,59 +36,72 @@ Proje kapsamında, problemin çözümü için **4 farklı modern yaklaşım** ge
 
 ---
 
-## ⚙️ 3. Teknik Mimari ve Matematiksel Model
-Proje, **Python (Backend)** hesaplama motoru ve **HTML/JS (Frontend)** görselleştirme arayüzünü birleştiren modüler bir yapıdadır.
+## ⚙️ 3. Teknik Mimari
+Proje, tamamen modern web teknolojileri kullanılarak geliştirilmiştir.
 
-### Matematiksel Maliyet Fonksiyonu (Fitness Function)
-Bir yolun kalitesi ($TotalCost$), aşağıdaki ağırlıklı toplam formülü ile hesaplanır:
+### Teknoloji Yığını
+*   **Dil:** TypeScript (Tip güvenliği için)
+*   **Framework:** React 18
+*   **Derleyici:** Vite (Hızlı geliştirme için)
+*   **Görselleştirme:** `react-force-graph-3d` (Three.js tabanlı)
+*   **Grafikler:** Recharts (İstatistiksel analiz için)
+*   **Stil:** TailwindCSS, Glassmorphism UI
+
+### Matematiksel Maliyet Fonksiyonu (QoS)
+Bir yolun toplam maliyeti ($TotalCost$), aşağıdaki ağırlıklı toplam formülü ile hesaplanır:
 
 $$Skor = (W_{1} \times Gecikme) + (W_{2} \times GüvenilirlikMaliyeti) + (W_{3} \times KaynakMaliyeti)$$
 
-* **Güvenilirlik:** Çarpımsal olduğu için `-log(Reliability)` alınarak toplamsal maliyete dönüştürülmüştür.
-* **Kaynak:** `1000 / Bant Genişliği` formülü ile darboğaz yaratan yollara ceza puanı verilir.
+* **Güvenilirlik:** `-log(Reliability)` dönüşümü ile toplamsal hale getirilir.
+* **Kaynak:** `1 / Bant Genişliği` etkisi ile darboğazlar cezalandırılır.
 
-### Proje Dosya Yapısı
+### Dosya Yapısı (`project/src`)
 ```text
-/BSM307_Proje
-  ├── app.py               # Flask Web Sunucusu (Web Arayüzü Başlatıcı)
-  ├── main.py              # Terminal Üzerinden Performans Testi (Benchmark)
-  ├── algorithms.py        # 4 Yapay Zeka Algoritmasının Motoru (ACO, ABC, GA, QL)
-  ├── network_generator.py # Gelişmiş Ağ Oluşturucu (Seed & JSON Desteği)
-  ├── /templates
-  │     └── index.html     # Web Arayüz Tasarımı (HTML)
-  ├── /static
-  │     ├── style.css      # Stil Dosyası
-  │     └── script.js      # Harita Çizimi (Vis.js / Cytoscape)
-  └── requirements.txt     # Gerekli kütüphaneler
-  ```
+/src
+  ├── components/
+  │     ├── DunyaHaritasi.tsx  # 3D Dünya ve Ağ Görselleştirmesi
+  │     └── DeneyYurutucu.tsx  # Test ve İstatistik Modülü
+  ├── services/
+  │     ├── algoritmalar.ts    # GA, ACO, ABC, Q-Learning Mantığı
+  │     └── api.ts             # Backend Bağlantısı (Opsiyonel)
+  ├── tipler.ts                # TypeScript Arayüzleri (Interface)
+  └── App.tsx                  # Ana Uygulama ve UI Yönetimi
+```
 
-## 🚀 5. Kurulum ve Çalıştırma
+---
 
-Projeyi çalıştırmak için aşağıdaki adımları izleyin:
+## 🚀 4. Kurulum ve Çalıştırma
 
-1.  **Depoyu İndirin:**
+Projeyi yerel makinenizde çalıştırmak için Node.js yüklü olmalıdır.
+
+1.  **Depoyu Klonlayın:**
     ```bash
-    git clone [https://github.com/NyancatGo/BSM307_Proje.git](https://github.com/NyancatGo/BSM307_Proje.git)
+    git clone https://github.com/NyancatGo/BSM307_Proje.git
     cd BSM307_Proje
     ```
 
-2.  **Kütüphaneleri Yükleyin:**
+2.  **Proje Klasörüne Girin:**
     ```bash
-    pip install networkx matplotlib numpy flask pandas
+    cd project
     ```
 
-3.  **Uygulamayı Başlatın:**
+3.  **Bağımlılıkları Yükleyin:**
     ```bash
-    python app.py
+    npm install
     ```
 
+4.  **Uygulamayı Başlatın:**
+    ```bash
+    npm run dev
+    ```
+    Tarayıcınızda `http://localhost:5173` adresine giderek uygulamayı kullanabilirsiniz.
 
 ---
 
-## 📅 Önemli Tarihler
-* **Kod Teslimi:** 31 Aralık 2025
-* **Video Teslimi:** 31 Aralık 2025
-* **Final Raporu:** 7 Ocak 2026
+## 📅 Takvim ve Durum
+* **Geliştirme:** Tamamlandı ✅
+* **Testler:** Tamamlandı ✅
+* **Dokümantasyon:** Güncel
 
 ---
-*BSM307 Güz Dönemi Projesi - Tüm Hakları Saklıdır.*
+*BSM307 Güz Dönemi Projesi*

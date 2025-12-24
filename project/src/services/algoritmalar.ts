@@ -98,7 +98,13 @@ export const baglantiKontrol = (cizge: CizgeVerisi, baslangic: number, bitis: nu
  * @param yol Node ID'lerinden oluşan sıralı liste
  * @param cizge Graf verisi
  */
-const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi) => {
+/**
+ * Bir yolun (path) metriklerini (gecikme, güvenilirlik, maliyet) hesaplar.
+ * @param yol Node ID'lerinden oluşan sıralı liste
+ * @param cizge Graf verisi
+ * @param baglantiHaritasi Hızlı erişim için link haritası (Opsiyonel, performans için önerilir)
+ */
+const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi, baglantiHaritasi?: Map<string, Baglanti>) => {
     let toplamGecikme = 0;
     let toplamLogGuvenilirlik = 0; // Logaritmik Toplam (Çarpım işlemini toplama dönüştürmek için)
     let toplamKaynakMaliyeti = 0;
@@ -109,24 +115,37 @@ const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi) => {
         const v = yol[i + 1];
 
         // İki düğüm arasındaki bağlantıyı (Link) ve hedef düğümü (Node) buluyoruz
-        const baglanti = cizge.links.find(l => (l.source === u && l.target === v) || (l.source === v && l.target === u));
+        let baglanti: Baglanti | undefined;
+
+        if (baglantiHaritasi) {
+            // O(1) Erişim
+            baglanti = baglantiHaritasi.get(`${u}-${v}`) || baglantiHaritasi.get(`${v}-${u}`);
+        } else {
+            // O(N) Erişim (Fallback)
+            baglanti = cizge.links.find(l => (l.source === u && l.target === v) || (l.source === v && l.target === u));
+        }
+
         const hedefDugum = cizge.nodes.find(n => n.id === v);
 
         if (baglanti && hedefDugum) {
             // A) GECİKME (Delay): Link İletim Süresi + Hedef Düğüm İşlem Süresi
             toplamGecikme += baglanti.propagationDelay + (hedefDugum.processingDelay || 0);
 
+            // A) GECİKME (Delay): Link İletim Süresi + Hedef Düğüm İşlem Süresi
+            toplamGecikme += baglanti.propagationDelay + (hedefDugum.processingDelay || 0);
+
             // B) GÜVENİLİRLİK (Reliability): Logaritmik Dönüşüm
-            // Çarpım işlemi optimizasyonda kararsızlık yaratabilir, bu yüzden logaritma ile toplama çeviriyoruz.
-            const bGuven = Math.max(0.0001, baglanti.reliability || 0.99);
+            // Pre-calculation varsayımı: baglanti.logReliability varsa kullan, yoksa hesapla
+            const logRel = baglanti.logReliability ?? -Math.log(Math.max(0.0001, baglanti.reliability || 0.99));
+            // Node reliability sabit kabul edilebilir veya ihmal edilebilir, ama burada hesaplıyoruz
             const dGuven = Math.max(0.0001, hedefDugum.reliability || 0.99);
 
-            toplamLogGuvenilirlik += (-Math.log(bGuven)) + (-Math.log(dGuven));
-            hamGuvenilirlik *= (bGuven * dGuven);
+            toplamLogGuvenilirlik += logRel + (-Math.log(dGuven));
+            hamGuvenilirlik *= ((baglanti.reliability || 0.99) * dGuven);
 
             // C) KAYNAK KULLANIMI (Resource Cost): Bant Genişliği ile Ters Orantılı
-            // Yüksek bant genişliği = Düşük maliyet
-            toplamKaynakMaliyeti += (1000 / (baglanti.bandwidth || 100));
+            // Pre-calculation varsa kullan
+            toplamKaynakMaliyeti += baglanti.resourceCost ?? (1000 / (baglanti.bandwidth || 100));
         }
     }
 
@@ -138,6 +157,24 @@ const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi) => {
         hopCount: yol.length - 1,
         weightedCost: 0
     };
+};
+
+// Yardımcı: Hızlı Bağlantı Haritası Oluşturucu (Pre-Calculation Dahil)
+const haritaOlustur = (links: Baglanti[]): Map<string, Baglanti> => {
+    const map = new Map<string, Baglanti>();
+    links.forEach(l => {
+        // Pre-calculation (Ön Hesaplama)
+        // Bu değerler döngü içinde milyonlarca kez tekrar hesaplanmaz, burada bir kere hesaplanır.
+        const logRel = -Math.log(Math.max(0.0001, l.reliability || 0.99));
+        const resCost = 1000 / (l.bandwidth || 100);
+
+        const linkWithMets = { ...l, logReliability: logRel, resourceCost: resCost };
+
+        map.set(`${l.source}-${l.target}`, linkWithMets);
+        // Yönsüz graf varsayımıyla ters yönü de ekle
+        map.set(`${l.target}-${l.source}`, linkWithMets);
+    });
+    return map;
 };
 
 /**
@@ -182,6 +219,7 @@ export const genetikAlgoritmayiCalistir = (
 ): YolSonucu => {
     const baslamaZamani = performance.now();
     const rng = new TohumluRNG(parametreler.seed ?? Math.floor(Math.random() * 99999));
+    const baglantiHaritasi = haritaOlustur(cizge.links);
 
     // Rastgele Yol Üretici
     const rastgeleYolOlustur = (): number[] => {
@@ -222,15 +260,15 @@ export const genetikAlgoritmayiCalistir = (
     for (let iter = 0; iter < (parametreler.iterations || 50); iter++) {
         // Fitness Hesaplama ve Sıralama
         populasyon.sort((a, b) => {
-            const maliyetA = agirlikliMaliyetHesapla(yolMetrikleriniHesapla(a, cizge), parametreler);
-            const maliyetB = agirlikliMaliyetHesapla(yolMetrikleriniHesapla(b, cizge), parametreler);
+            const maliyetA = agirlikliMaliyetHesapla(yolMetrikleriniHesapla(a, cizge, baglantiHaritasi), parametreler);
+            const maliyetB = agirlikliMaliyetHesapla(yolMetrikleriniHesapla(b, cizge, baglantiHaritasi), parametreler);
             return maliyetA - maliyetB;
         });
 
         // En İyiyi Kaydet
         if (populasyon.length > 0) {
             const mevcutEnIyi = populasyon[0];
-            const mevcutMaliyet = agirlikliMaliyetHesapla(yolMetrikleriniHesapla(mevcutEnIyi, cizge), parametreler);
+            const mevcutMaliyet = agirlikliMaliyetHesapla(yolMetrikleriniHesapla(mevcutEnIyi, cizge, baglantiHaritasi), parametreler);
             if (mevcutMaliyet < minimumMaliyet) {
                 minimumMaliyet = mevcutMaliyet;
                 enIyiYol = [...mevcutEnIyi];
@@ -268,7 +306,7 @@ export const genetikAlgoritmayiCalistir = (
         populasyon = yeniPopulasyon;
     }
 
-    const metrikler = yolMetrikleriniHesapla(enIyiYol, cizge);
+    const metrikler = yolMetrikleriniHesapla(enIyiYol, cizge, baglantiHaritasi);
     // @ts-ignore
     metrikler.weightedCost = minimumMaliyet;
 
@@ -290,6 +328,7 @@ export const karincaKolonisiCalistir = (
 ): YolSonucu => {
     const baslamaZamani = performance.now();
     const rng = new TohumluRNG(parametreler.seed ?? Math.floor(Math.random() * 99999));
+    const baglantiHaritasi = haritaOlustur(cizge.links);
 
     // Feromon İzleri
     const feromonlar = new Map<string, number>();
@@ -344,7 +383,7 @@ export const karincaKolonisiCalistir = (
             }
 
             if (suanki === bitisDugum) {
-                const m = yolMetrikleriniHesapla(yol, cizge);
+                const m = yolMetrikleriniHesapla(yol, cizge, baglantiHaritasi);
                 const maliyet = agirlikliMaliyetHesapla(m, parametreler);
 
                 if (maliyet < globalMinimumMaliyet) {
@@ -370,7 +409,7 @@ export const karincaKolonisiCalistir = (
         }
     }
 
-    const metrikler = yolMetrikleriniHesapla(globalEnIyiYol, cizge);
+    const metrikler = yolMetrikleriniHesapla(globalEnIyiYol, cizge, baglantiHaritasi);
     // @ts-ignore
     metrikler.weightedCost = globalMinimumMaliyet;
 
@@ -392,6 +431,7 @@ export const pekisirmeliOgrenmeCalistir = (
 ): YolSonucu => {
     const baslamaZamani = performance.now();
     const rng = new TohumluRNG(parametreler.seed ?? Math.floor(Math.random() * 99999));
+    const baglantiHaritasi = haritaOlustur(cizge.links);
 
     const Q = new Map<string, number>(); // Q-Tablosu
     const qGetir = (s: number, a: number) => Q.get(`${s}-${a}`) || 0.0;
@@ -430,7 +470,7 @@ export const pekisirmeliOgrenmeCalistir = (
             }
 
             const sonrakiDurum = eylem;
-            const adimMaliyeti = agirlikliMaliyetHesapla(yolMetrikleriniHesapla([suanki, sonrakiDurum], cizge), parametreler);
+            const adimMaliyeti = agirlikliMaliyetHesapla(yolMetrikleriniHesapla([suanki, sonrakiDurum], cizge, baglantiHaritasi), parametreler);
 
             let odul = -adimMaliyeti;
             if (sonrakiDurum === bitisDugum) odul += 1000; // Hedef Ödülü
@@ -494,7 +534,7 @@ export const pekisirmeliOgrenmeCalistir = (
         return { path: [], metrics: { weightedCost: Infinity }, executionTime: performance.now() - baslamaZamani };
     }
 
-    const metrikler = yolMetrikleriniHesapla(enIyiYol, cizge);
+    const metrikler = yolMetrikleriniHesapla(enIyiYol, cizge, baglantiHaritasi);
     // @ts-ignore
     metrikler.weightedCost = agirlikliMaliyetHesapla(metrikler, parametreler);
 
@@ -512,6 +552,7 @@ export const yapayAriKolonisiCalistir = (
 ): YolSonucu => {
     const baslamaZamani = performance.now();
     const rng = new TohumluRNG(parametreler.seed ?? Math.floor(Math.random() * 99999));
+    const baglantiHaritasi = haritaOlustur(cizge.links);
 
     let enIyiYol: number[] = [];
     let minimumMaliyet = Infinity;
@@ -540,7 +581,7 @@ export const yapayAriKolonisiCalistir = (
         // İşi basit tutmak için ABC'nin rastgele arama varyasyonunu kullanıyoruz
         const yol = rastgeleYolUret();
         if (yol.length > 0) {
-            const m = yolMetrikleriniHesapla(yol, cizge);
+            const m = yolMetrikleriniHesapla(yol, cizge, baglantiHaritasi);
             const c = agirlikliMaliyetHesapla(m, parametreler);
             if (c < minimumMaliyet) {
                 minimumMaliyet = c;
@@ -549,7 +590,7 @@ export const yapayAriKolonisiCalistir = (
         }
     }
 
-    const metrikler = enIyiYol.length > 0 ? yolMetrikleriniHesapla(enIyiYol, cizge) : { weightedCost: Infinity };
+    const metrikler = enIyiYol.length > 0 ? yolMetrikleriniHesapla(enIyiYol, cizge, baglantiHaritasi) : { weightedCost: Infinity };
     if (enIyiYol.length > 0) {
         // @ts-ignore
         metrikler.weightedCost = minimumMaliyet;

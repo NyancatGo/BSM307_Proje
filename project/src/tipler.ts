@@ -23,6 +23,8 @@ export interface Baglanti {
     propagationDelay: number;// İletim Gecikmesi (ms)
     reliability: number;     // Bağlantı Güvenilirliği (0.0 - 1.0)
     score?: number;          // Hesaplanan Skor (Algoritma için)
+    logReliability?: number; // Önceden hesaplanmış -log(reliability)
+    resourceCost?: number;   // Önceden hesaplanmış kaynak maliyeti
 }
 
 // ----------------------------------------------------------------------------
