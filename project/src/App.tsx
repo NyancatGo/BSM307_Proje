@@ -476,7 +476,7 @@ const App: React.FC = () => {
                                     </label>
                                     <select
                                         className="w-full bg-slate-900 border border-yellow-600/50 rounded-lg p-2 text-xs text-yellow-100 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 outline-none transition-all"
-                                        onChange={(e) => {
+                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                             const idx = parseInt(e.target.value);
                                             setBaslangicDugum(talepler[idx].kaynak);
                                             setBitisDugum(talepler[idx].hedef);
@@ -501,7 +501,7 @@ const App: React.FC = () => {
                                 <select
                                     className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-white"
                                     value={seciliAlgoritma}
-                                    onChange={(e) => setSeciliAlgoritma(e.target.value as AlgoritmaTipi)}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSeciliAlgoritma(e.target.value as AlgoritmaTipi)}
                                     style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }}
                                 >
                                     <option value={AlgoritmaTipi.GENETIC}>🧬 Genetik Algoritma (GA)</option>
@@ -519,7 +519,7 @@ const App: React.FC = () => {
                                         type="number"
                                         style={{ width: "100%", background: "rgba(15, 23, 42, 0.6)", border: "1px solid #475569", color: "white", padding: "8px", borderRadius: "6px", fontSize: "13px", outline: "none" }}
                                         value={baslangicDugum}
-                                        onChange={(e) => setBaslangicDugum(Number(e.target.value))}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBaslangicDugum(Number(e.target.value))}
                                     />
                                 </div>
                                 <div>
@@ -528,7 +528,7 @@ const App: React.FC = () => {
                                         type="number"
                                         style={{ width: "100%", background: "rgba(15, 23, 42, 0.6)", border: "1px solid #475569", color: "white", padding: "8px", borderRadius: "6px", fontSize: "13px", outline: "none" }}
                                         value={bitisDugum}
-                                        onChange={(e) => setBitisDugum(Number(e.target.value))}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBitisDugum(Number(e.target.value))}
                                     />
                                 </div>
                                 <div style={{ gridColumn: "span 2" }}>
@@ -537,7 +537,7 @@ const App: React.FC = () => {
                                         type="number"
                                         style={{ width: "100%", background: "rgba(15, 23, 42, 0.6)", border: "1px solid #475569", color: "white", padding: "8px", borderRadius: "6px", fontSize: "13px", outline: "none" }}
                                         value={minBantGenisligi}
-                                        onChange={(e) => setMinBantGenisligi(Number(e.target.value))}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMinBantGenisligi(Number(e.target.value))}
                                         placeholder="0"
                                     />
                                 </div>
@@ -554,7 +554,7 @@ const App: React.FC = () => {
                                         <span style={{ color: "#cbd5e1" }}>Gecikme (Delay)</span>
                                         <span style={{ color: "#60a5fa", fontWeight: 'bold' }}>{agirliklar.wGecikme}</span>
                                     </span>
-                                    <input type="range" max="1" step="0.01" value={agirliklar.wGecikme} onChange={(e) => agirlikNormalizasyonu("gecikme", parseFloat(e.target.value))} style={{ width: "100%", height: "4px", accentColor: "#60a5fa" }} />
+                                    <input type="range" max="1" step="0.01" value={agirliklar.wGecikme} onChange={(e: React.ChangeEvent<HTMLInputElement>) => agirlikNormalizasyonu("gecikme", parseFloat(e.target.value))} style={{ width: "100%", height: "4px", accentColor: "#60a5fa" }} />
                                 </div>
 
                                 <div>
@@ -562,7 +562,7 @@ const App: React.FC = () => {
                                         <span style={{ color: "#cbd5e1" }}>Güvenilirlik (Reliability)</span>
                                         <span style={{ color: "#4ade80", fontWeight: 'bold' }}>{agirliklar.wGuvenilirlik}</span>
                                     </span>
-                                    <input type="range" max="1" step="0.01" value={agirliklar.wGuvenilirlik} onChange={(e) => agirlikNormalizasyonu("guven", parseFloat(e.target.value))} style={{ width: "100%", height: "4px", accentColor: "#4ade80" }} />
+                                    <input type="range" max="1" step="0.01" value={agirliklar.wGuvenilirlik} onChange={(e: React.ChangeEvent<HTMLInputElement>) => agirlikNormalizasyonu("guven", parseFloat(e.target.value))} style={{ width: "100%", height: "4px", accentColor: "#4ade80" }} />
                                 </div>
 
                                 <div>
@@ -570,7 +570,7 @@ const App: React.FC = () => {
                                         <span style={{ color: "#cbd5e1" }}>Kaynak Maliyeti (Cost)</span>
                                         <span style={{ color: "#c084fc", fontWeight: 'bold' }}>{agirliklar.wKaynak}</span>
                                     </span>
-                                    <input type="range" max="1" step="0.01" value={agirliklar.wKaynak} onChange={(e) => agirlikNormalizasyonu("kaynak", parseFloat(e.target.value))} style={{ width: "100%", height: "4px", accentColor: "#c084fc" }} />
+                                    <input type="range" max="1" step="0.01" value={agirliklar.wKaynak} onChange={(e: React.ChangeEvent<HTMLInputElement>) => agirlikNormalizasyonu("kaynak", parseFloat(e.target.value))} style={{ width: "100%", height: "4px", accentColor: "#c084fc" }} />
                                 </div>
                             </div>
 
@@ -722,7 +722,7 @@ const App: React.FC = () => {
                                             contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px", color: "#fff" }}
                                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                             formatter={(value: number) => value.toFixed(2)}
-                                            labelFormatter={(label) => {
+                                            labelFormatter={(label: any) => {
                                                 // Tooltip'te uzun ismi göstermek için kiyaslamaVerisi'nden bul
                                                 const match = kiyaslamaVerisi.find(v => v.name === label);
                                                 return match ? match.fullName : label;
