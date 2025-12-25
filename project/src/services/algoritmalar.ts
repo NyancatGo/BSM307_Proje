@@ -194,7 +194,9 @@ const agirlikliMaliyetHesapla = (metrikler: any, parametreler: AlgoritmaParametr
     return (
         (normD * metrikler.totalDelay) +
         (normR * metrikler.totalLogRel * 100) +
-        (normK * metrikler.resourceCost)
+        (normK * metrikler.resourceCost) +
+        // ✂️ MAKAS: Her zıplama +50 ceza puanı (Kestirme yol zorlaması).
+        ((metrikler.hopCount || 0) * 50)
     );
 };
 

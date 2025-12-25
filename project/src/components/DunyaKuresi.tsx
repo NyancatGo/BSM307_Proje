@@ -5,16 +5,23 @@ import { CizgeVerisi } from "../tipler";
 import { kimlikGetir } from "../services/algoritmalar";
 
 // ----------------------------------------------------------------------------
+// GLOBAL OPTİMİZASYON NESNELERİ (RAM Tasarrufu)
+// ----------------------------------------------------------------------------
+// Görünmeyen linkler için sürekli yeni Object3D yaratmak yerine
+// tek bir boş nesneyi referans olarak dönüyoruz. Çöp toplayıcı (GC) rahatlıyor.
+const BOS_NESNE = new THREE.Object3D();
+
+// ----------------------------------------------------------------------------
 // BİLEŞEN ÖZELLİKLERİ (PROPS)
 // ----------------------------------------------------------------------------
 interface DunyaHaritasiProps {
-    graf: CizgeVerisi;         // Görüntülenecek Graf Verisi
-    yolSonucu: number[];       // Seçilen/Hesaplanan Yol (Node ID Listesi)
-    baslangicDugum: number;    // Başlangıç Düğüm ID
-    bitisDugum: number;        // Bitiş Düğüm ID
-    otomatikDonus: boolean;    // Dünya dönsün mü?
-    algoritmaAdi: string;      // Çalışan algoritmanın adı (Renk için)
-    istatistikler?: {          // Yolun hesaplanan metrikleri
+    graf: CizgeVerisi;
+    yolSonucu: number[];
+    baslangicDugum: number;
+    bitisDugum: number;
+    otomatikDonus: boolean;
+    algoritmaAdi: string;
+    istatistikler?: {
         totalDelay: number;
         totalReliability: number;
         resourceCost: number;
@@ -25,8 +32,7 @@ interface DunyaHaritasiProps {
 const DUNYA_YARICAPI = 60;
 const YORUNGE_YARICAPI = 75;
 
-// Throttle (Hız Sınırlayıcı) Yardımcı Fonksiyonu
-// Performans için event handler'ların çalışma sıklığını sınırlar.
+// Throttle (Hız Sınırlayıcı)
 function hizSinirlayici<T extends (...args: any[]) => any>(fonksiyon: T, limit: number): T {
     let sinirlamada: boolean;
     return function (this: any, ...argumanlar: any[]) {
@@ -48,17 +54,15 @@ const ALGORITMA_RENKLERI: Record<string, string> = {
     Q_LEARNING: "#a855f7",   // MOR (Q-Learning)
     ABC: "#3b82f6",          // MAVİ (Arı)
 
-    // İngilizce İsim Eşleştirmeleri (Eski kod uyumu için)
     "Genetic Algorithm": "#facc15",
     "Ant Colony Optimization": "#ef4444",
     "Q-Learning (RL)": "#a855f7",
     "Artificial Bee Colony": "#3b82f6",
 
-    // TÜRKÇE İSİM EŞLEŞTİRMELERİ
     "Genetik Algoritma (GA)": "#facc15",
     "Karınca Kolonisi (ACO)": "#ef4444",
-    "Pekiştirmeli Öğrenme (Q-Learning)": "#a855f7", // İsim tipler.ts ile aynı olmalı
-    "Q-Learning (Pekiştirmeli Öğrenme)": "#a855f7", // İsim tipler.ts ile aynı olmalı
+    "Pekiştirmeli Öğrenme (Q-Learning)": "#a855f7",
+    "Q-Learning (Pekiştirmeli Öğrenme)": "#a855f7",
     "Yapay Arı Kolonisi (ABC)": "#3b82f6",
 };
 
@@ -74,25 +78,26 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
     algoritmaAdi,
     istatistikler
 }) => {
-    const grafikReferansi = useRef<ForceGraphMethods>(); // 3D Graf Motoru Referansı
+    const grafikReferansi = useRef<ForceGraphMethods>();
     const sahneHazir = useRef(false);
 
-    // 1. HIZLI ARAMA KÜMESİ: Performans için yol üzerindeki node'ları Set'te tutuyoruz
+    // 3. OPTİMİZASYON: TOOLTIP REFERANSI (State yerine Ref)
+    // React render döngüsüne girmeden doğrudan DOM manipülasyonu yapacağız.
+    const tooltipRef = useRef<HTMLDivElement>(null);
+
+    // 1. HIZLI ARAMA KÜMESİ
     const yolKumesi = useMemo(() => new Set(yolSonucu), [yolSonucu]);
     const algoritmaRengi = useMemo(() => ALGORITMA_RENKLERI[algoritmaAdi] ?? "#ffffff", [algoritmaAdi]);
 
-    // 2. SABİT VERİ: Node pozisyonları sabit, fizik motoru kapalı
-    // Bu kısım 250+ node olduğunda FPS düşmesini engellemek için kritik.
+    // 2. SABİT VERİ (Node Pinning)
     const sabitVeri = useMemo(() => {
         if (!graf) return { nodes: [], links: [] };
 
-        // Düğümleri Fibonacci Küresi algoritması ile dünya üzerine eşit dağıtıyoruz
         const dugumler = graf.nodes.map((d, i) => {
             const phi = Math.acos(1 - 2 * (i + 0.5) / graf.nodes.length);
             const theta = Math.PI * (1 + Math.sqrt(5)) * i;
             return {
                 ...d,
-                // Sabit pozisyonlar (Force Engine kullanmayacağız)
                 fx: YORUNGE_YARICAPI * Math.sin(phi) * Math.cos(theta),
                 fy: YORUNGE_YARICAPI * Math.sin(phi) * Math.sin(theta),
                 fz: YORUNGE_YARICAPI * Math.cos(phi)
@@ -101,16 +106,14 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         return { nodes: dugumler, links: graf.links.map(l => ({ ...l })) };
     }, [graf]);
 
-    // 3. BAĞLANTI KONTROLÜ (Bu bağlantı seçili yolda mı?)
+    // 3. BAĞLANTI KONTROLÜ
     const baglantiYoldaMi = useCallback((baglanti: any) => {
         if (yolSonucu.length < 2) return false;
         const kaynak = kimlikGetir(baglanti.source);
         const hedef = kimlikGetir(baglanti.target);
 
-        // Hızlı kontrol: İki uç da yol kümesinde olmalı
         if (!yolKumesi.has(kaynak) || !yolKumesi.has(hedef)) return false;
 
-        // Kesin kontrol: Ardışık sıralama (Yol A -> B -> C ise, A-B ve B-C bağlantıları geçerlidir)
         for (let i = 0; i < yolSonucu.length - 1; i++) {
             const p1 = yolSonucu[i];
             const p2 = yolSonucu[i + 1];
@@ -119,59 +122,42 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         return false;
     }, [yolSonucu, yolKumesi]);
 
-    // RENK VE STİL FONKSİYONLARI (Memoize edilmiş)
+    // RENK VE STİL FONKSİYONLARI
     const dugumRengiGetir = useCallback((d: any) => {
-        if (d.id === baslangicDugum) return "#00ff44"; // YEŞİL (Başlangıç)
-        if (d.id === bitisDugum) return "#ff3333";    // KIRMIZI (Bitiş)
-        if (yolKumesi.has(d.id)) return "#ffcc00";    // SARI (Yol Üzeri)
-        return "#0088ff"; // MAVİ (Pasif Düğüm)
+        if (d.id === baslangicDugum) return "#00ff44";
+        if (d.id === bitisDugum) return "#ff3333";
+        if (yolKumesi.has(d.id)) return "#ffcc00";
+        return "#0088ff";
     }, [baslangicDugum, bitisDugum, yolKumesi]);
 
-    // X-Ray Materyal (Dünyanın içinden görünmesi için - depthTest: false)
+    // 2. OPTİMİZASYON: GPU HAFIZASI (Geometry & Material Reuse)
     const xrayYolMat = useMemo(() => new THREE.MeshBasicMaterial({
-        color: algoritmaRengi, // Dinamik Renk (Algoritma Rengi)
-        depthTest: false,      // Kritik: Dünyanın arkasında olsa bile çiz
+        color: algoritmaRengi,
+        depthTest: false,
         depthWrite: false,
         transparent: true,
         opacity: 0.8
     }), [algoritmaRengi]);
 
-    const xrayYolGeo = useMemo(() => {
-        const yariCap = 0.6; // Görünür çizgi kalınlığı
-        return new THREE.CylinderGeometry(yariCap, yariCap, 1, 6);
-    }, []);
-
-    // GÖRÜNMEZ TIKLAMA ALANI (HITBOX) OLUŞTURMA
-    const ortakHitboxMat = useMemo(() => new THREE.MeshBasicMaterial({
-        visible: true,
-        opacity: 0.0,
-        transparent: true,
-        depthWrite: false
-    }), []);
-
-    const ortakHitboxGeo = useMemo(() => {
-        const yariCap = 6;
-        const geo = new THREE.CylinderGeometry(yariCap, yariCap, 1, 4);
-        geo.rotateZ(Math.PI / 2);
-        return geo;
-    }, []);
+    const xrayYolGeo = useMemo(() => new THREE.CylinderGeometry(0.6, 0.6, 1, 6), []);
+    const ortakHitboxMat = useMemo(() => new THREE.MeshBasicMaterial({ visible: true, opacity: 0.0, transparent: true, depthWrite: false }), []);
+    const ortakHitboxGeo = useMemo(() => new THREE.CylinderGeometry(6, 6, 1, 4).rotateZ(Math.PI / 2), []);
 
     const baglantiObjesiGetir = useCallback((baglanti: any) => {
-        if (baglantiYoldaMi(baglanti)) {
-            const grup = new THREE.Group();
+        // GÖRÜNMEYENLER İÇİN BOŞ NESNE (RAM TASARRUFU)
+        if (!baglantiYoldaMi(baglanti)) return BOS_NESNE;
 
-            // 1. Görünür X-Ray Mesh
-            const gorunurMesh = new THREE.Mesh(xrayYolGeo, xrayYolMat);
-            gorunurMesh.renderOrder = 999; // Her şeyin üstünde çizilmesini garanti et
-            grup.add(gorunurMesh);
+        const grup = new THREE.Group();
+        // Görünür X-Ray Mesh (Shared Geometry & Material)
+        const gorunurMesh = new THREE.Mesh(xrayYolGeo, xrayYolMat);
+        gorunurMesh.renderOrder = 999;
+        grup.add(gorunurMesh);
 
-            // 2. Tıklama Alanı
-            const hitboxMesh = new THREE.Mesh(ortakHitboxGeo, ortakHitboxMat);
-            grup.add(hitboxMesh);
+        // Hitbox (Shared Geometry & Material)
+        const hitboxMesh = new THREE.Mesh(ortakHitboxGeo, ortakHitboxMat);
+        grup.add(hitboxMesh);
 
-            return grup;
-        }
-        return new THREE.Group();
+        return grup;
     }, [baglantiYoldaMi, xrayYolGeo, xrayYolMat, ortakHitboxGeo, ortakHitboxMat]);
 
     const baglantiKonumGuncelle = useCallback((obje: any, { start, end }: any, baglanti: any) => {
@@ -184,7 +170,6 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         obje.position.copy(orta);
         const mesafe = baslangic.distanceTo(bitis);
 
-        // Ana grup scale güncellemesi (Hem çizgi hem hitbox)
         obje.scale.set(1, mesafe, 1);
         obje.lookAt(bitis);
         obje.rotateX(Math.PI / 2);
@@ -192,19 +177,20 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         return false;
     }, [baglantiYoldaMi]);
 
-    // LİNK GÖRÜNÜM AYARLARI
-    // Yol linkleri için width=0 yapıyoruz çünkü baglantiObjesiGetir ile özel çiziyoruz.
-    // Arka plan linklerini TAMAMEN GİZLİYORUZ (Kullanıcı talebi).
     const baglantiGenisligiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0, [baglantiYoldaMi]);
     const baglantiRengiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? "transparent" : "transparent", [baglantiYoldaMi]);
     const baglantiEgrilikGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0.1, [baglantiYoldaMi]);
 
-    // 4. SAHNE KURULUMU (THREE.JS)
+    const parcacikHiziGetir = useCallback((baglanti: any) => {
+        if (baglantiYoldaMi(baglanti)) return 0.02;
+        return 0;
+    }, [baglantiYoldaMi]);
+
+    // SAHNE KURULUMU
     useEffect(() => {
         const fg = grafikReferansi.current;
         if (!fg || sahneHazir.current) return;
 
-        // Renderer Optimizasyonu
         const renderer = fg.renderer();
         if (renderer) {
             renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -213,30 +199,22 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         }
 
         const sahne = fg.scene();
-
-        // Dünya Dokusu ve Mesh
         const dokuYukleyici = new THREE.TextureLoader();
         const dunyaDokusu = dokuYukleyici.load("//unpkg.com/three-globe/example/img/earth-night.jpg");
         const dunya = new THREE.Mesh(
             new THREE.SphereGeometry(DUNYA_YARICAPI, 24, 24),
-            new THREE.MeshLambertMaterial({
-                map: dunyaDokusu,
-                color: 0xaaaaaa
-            })
+            new THREE.MeshLambertMaterial({ map: dunyaDokusu, color: 0xaaaaaa })
         );
         sahne.add(dunya);
 
-        // Işıklandırma
         sahne.add(new THREE.AmbientLight(0xffffff, 0.6));
         const gunes = new THREE.DirectionalLight(0xffffff, 1.5);
         gunes.position.set(100, 50, 100);
         sahne.add(gunes);
 
-        // Yıldızlar (Arka Plan)
         const yildizGeo = new THREE.BufferGeometry();
-        const yildizSayisi = 200;
-        const yildizKonumlari = new Float32Array(yildizSayisi * 3);
-        for (let i = 0; i < yildizSayisi * 3; i++) yildizKonumlari[i] = (Math.random() - 0.5) * 3000;
+        const yildizKonumlari = new Float32Array(600);
+        for (let i = 0; i < 600; i++) yildizKonumlari[i] = (Math.random() - 0.5) * 3000;
         yildizGeo.setAttribute("position", new THREE.BufferAttribute(yildizKonumlari, 3));
         const yildizlar = new THREE.Points(yildizGeo, new THREE.PointsMaterial({ color: 0x888888, size: 1.5 }));
         sahne.add(yildizlar);
@@ -244,7 +222,7 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         sahneHazir.current = true;
     }, []);
 
-    // 5. OTOMATİK DÖNÜŞ KONTROLÜ
+    // DÖNÜŞ KONTROLÜ
     useEffect(() => {
         const fg = grafikReferansi.current;
         if (!fg) return;
@@ -259,37 +237,20 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         }
     }, [otomatikDonus]);
 
-    // 6. MOUSE TOOLTIP ETKİLEŞİMİ
-    const [ipucuBilgisi, setIpucuBilgisi] = useState<{ x: number, y: number, baglanti: any } | null>(null);
-    const fareKonumu = useRef({ x: 0, y: 0 });
-
-    useEffect(() => {
-        const fareTakip = (olay: MouseEvent) => {
-            fareKonumu.current = { x: olay.clientX, y: olay.clientY };
-        };
-        window.addEventListener('mousemove', fareTakip);
-        return () => window.removeEventListener('mousemove', fareTakip);
-    }, []);
-
-    // 7. YOL YÖNÜ NORMALİZASYONU
-    // Graf kütüphanesi linkleri karıştırabilir, biz yolun akış yönünü (Source -> Target) garanti altına alıyoruz.
+    // YOL YÖNÜ DÜZELTME
     useEffect(() => {
         if (!yolSonucu || yolSonucu.length < 2) return;
-
         for (let i = 0; i < yolSonucu.length - 1; i++) {
             const u = yolSonucu[i];
             const v = yolSonucu[i + 1];
-
             const baglanti = sabitVeri.links.find((l: any) => {
                 const s = kimlikGetir(l.source);
                 const t = kimlikGetir(l.target);
                 return (String(s) === String(u) && String(t) === String(v)) ||
                     (String(s) === String(v) && String(t) === String(u));
             });
-
             if (baglanti) {
                 const s = kimlikGetir(baglanti.source);
-                // Eğer link TERS ise (v -> u), kalıcı olarak değiştir.
                 if (String(s) === String(v)) {
                     const temp = baglanti.source;
                     baglanti.source = baglanti.target;
@@ -299,76 +260,68 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         }
     }, [yolSonucu, sabitVeri]);
 
-    // 8. PAKET ANİMASYONU (VERİ AKIŞI GÖRSELLEŞTİRME)
+    // PAKET ANİMASYONU
     useEffect(() => {
         if (!yolSonucu || yolSonucu.length < 2) return;
         const fg = grafikReferansi.current;
         if (!fg) return;
-
         const TREN_ARALIGI = 2000;
         const HOP_SURESI = 1000 / 60 / 0.02;
-
         const zamanlayici = setInterval(() => {
             for (let i = 0; i < yolSonucu.length - 1; i++) {
                 const u = yolSonucu[i];
                 const v = yolSonucu[i + 1];
-
                 const baglanti = sabitVeri.links.find((l: any) => {
                     const s = kimlikGetir(l.source);
                     const t = kimlikGetir(l.target);
                     return (String(s) === String(u) && String(t) === String(v)) ||
                         (String(s) === String(v) && String(t) === String(u));
                 });
-
                 if (baglanti) {
                     const s = typeof baglanti.source === 'object' ? (baglanti.source as any).id : baglanti.source;
                     if (String(s) === String(yolSonucu[yolSonucu.length - 1])) continue;
-
-                    setTimeout(() => {
-                        fg.emitParticle(baglanti);
-                    }, i * (HOP_SURESI * 0.85));
+                    setTimeout(() => { fg.emitParticle(baglanti); }, i * (HOP_SURESI * 0.85));
                 }
             }
         }, TREN_ARALIGI);
-
         return () => clearInterval(zamanlayici);
     }, [yolSonucu, sabitVeri]);
 
-    const parcacikHiziGetir = useCallback((baglanti: any) => {
-        if (baglantiYoldaMi(baglanti)) return 0.02;
-        return 0;
-    }, [baglantiYoldaMi]);
+    // 4. MOUSE EVENTLERI (STATE YOK, DOĞRUDAN DOM GÜNCELLEME)
+    const baglantiUzerineGelme = useCallback((baglanti: any) => {
+        const tooltip = tooltipRef.current;
+        if (!tooltip) return;
 
-
-
-    // FARE İLE ÜZERİNE GELME (HOVER) OLAYLARI
-    const baglantiUzerineGelme = useMemo(() => hizSinirlayici((baglanti: any) => {
         if (baglanti && baglantiYoldaMi(baglanti)) {
-            setIpucuBilgisi({
-                x: fareKonumu.current.x,
-                y: fareKonumu.current.y,
-                baglanti: baglanti
-            });
+            const kaynak = kimlikGetir(baglanti.source);
+            const hedef = kimlikGetir(baglanti.target);
+
+            tooltip.innerHTML = `
+                <div class="font-bold text-yellow-400 mb-1 border-b border-gray-600 pb-1">BAĞLANTI DETAYI</div>
+                <div class="text-xs text-gray-300">Kaynak: <span class="text-white">${kaynak}</span></div>
+                <div class="text-xs text-gray-300">Hedef: <span class="text-white">${hedef}</span></div>
+            `;
+
+            tooltip.style.display = 'block';
             document.body.style.cursor = 'pointer';
         } else {
-            setIpucuBilgisi(null);
+            tooltip.style.display = 'none';
             document.body.style.cursor = 'default';
         }
-    }, 10), [baglantiYoldaMi]);
+    }, [baglantiYoldaMi]);
 
-    const dugumUzerineGelme = useMemo(() => hizSinirlayici((dugum: any) => {
-        if (dugum && yolKumesi.has(dugum.id)) {
-            setIpucuBilgisi({
-                x: fareKonumu.current.x,
-                y: fareKonumu.current.y,
-                baglanti: { source: dugum.id, target: dugum.id } // Dummy
-            });
-            document.body.style.cursor = 'pointer';
-        } else if (!ipucuBilgisi?.baglanti) {
-            setIpucuBilgisi(null);
-            document.body.style.cursor = 'default';
+    const fareTakip = useCallback((e: MouseEvent) => {
+        const tooltip = tooltipRef.current;
+        if (tooltip && tooltip.style.display === 'block') {
+            tooltip.style.left = `${e.clientX + 15}px`;
+            tooltip.style.top = `${e.clientY + 15}px`;
         }
-    }, 10), [yolKumesi, ipucuBilgisi]);
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('mousemove', fareTakip);
+        return () => window.removeEventListener('mousemove', fareTakip);
+    }, [fareTakip]);
 
     return (
         <div className="w-full h-full relative bg-black">
@@ -376,14 +329,6 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
                 ref={grafikReferansi}
                 graphData={sabitVeri}
                 backgroundColor="rgba(0,0,0,0)"
-
-                rendererConfig={{
-                    antialias: false,
-                    alpha: true,
-                    powerPreference: "high-performance",
-                    stencil: false,
-                    depth: true
-                }}
 
                 warmupTicks={0}
                 cooldownTicks={0}
@@ -400,7 +345,6 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
                 linkWidth={baglantiGenisligiGetir}
                 linkColor={baglantiRengiGetir}
                 linkCurvature={baglantiEgrilikGetir}
-                linkResolution={5}
 
                 linkDirectionalParticles={0}
                 linkDirectionalParticleWidth={5}
@@ -412,57 +356,30 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
                 linkThreeObject={baglantiObjesiGetir}
                 linkPositionUpdate={baglantiKonumGuncelle}
                 onLinkHover={baglantiUzerineGelme}
-                onNodeHover={dugumUzerineGelme}
             />
 
-            {/* ÖZEL İPUCU KUTUSU (TOOLTIP) */}
-            {ipucuBilgisi && ipucuBilgisi.baglanti && istatistikler && (
-                <div style={{
+            {/* REACT TARAFINDAN YÖNETİLMEYEN, MANUEL GÜNCELLENEN TOOLTIP DOM'U */}
+            <div
+                ref={tooltipRef}
+                style={{
                     position: 'fixed',
-                    left: ipucuBilgisi.x + 10,
-                    top: ipucuBilgisi.y + 10,
+                    display: 'none',
                     backgroundColor: 'rgba(0, 0, 0, 0.95)',
                     color: '#fff',
                     padding: '8px 12px',
                     borderRadius: '6px',
                     fontSize: '12px',
                     pointerEvents: 'none',
-                    zIndex: 1000,
+                    zIndex: 9999,
                     border: '1px solid #475569',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
-                    maxWidth: '240px'
-                }}>
-                    <div className="font-bold mb-1 text-yellow-400 border-b border-gray-700 pb-1">Seçili Rota Özeti</div>
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.5)',
+                    minWidth: '150px'
+                }}
+            />
 
-                    <div className="flex flex-col gap-1 mb-2">
-                        <div className="text-xs text-gray-400">Algoritma: <span className="text-gray-200 font-semibold">{algoritmaAdi}</span></div>
-                    </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between items-center gap-4">
-                            <span className="text-gray-400">Toplam Gecikme:</span>
-                            <span className="text-blue-400 font-mono font-bold">{istatistikler.totalDelay.toFixed(2)} ms</span>
-                        </div>
-                        <div className="flex justify-between items-center gap-4">
-                            <span className="text-gray-400">Toplam Güvenilirlik:</span>
-                            <span className="text-green-400 font-mono font-bold">%{(istatistikler.totalReliability * 100).toFixed(4)}</span>
-                        </div>
-                        <div className="flex justify-between items-center gap-4">
-                            <span className="text-gray-400">Kaynak Tüketimi:</span>
-                            <span className="text-purple-400 font-mono font-bold">{istatistikler.resourceCost.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-gray-700">
-                        <div className="text-[10px] text-gray-500 mb-1">ROTA (Node ID'leri):</div>
-                        <div className="text-[10px] text-white font-mono leading-tight break-all bg-gray-900/50 p-1 rounded">
-                            {yolSonucu.join(" → ")}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
-    )
-}
+    );
+};
 
 export default DunyaHaritasi;

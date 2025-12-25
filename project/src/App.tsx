@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import DunyaHaritasi from "./components/DunyaHaritasi";
+import React, { useEffect, useState } from "react"; // Re-trigger build
+import DunyaHaritasi from "./components/DunyaKuresi";
 import DeneyYurutucu from "./components/DeneyYurutucu";
 import { AlgoritmaTipi, CizgeVerisi, YolSonucu, Baglanti } from "./tipler";
 // import { yapayAriKolonisiCalistir, karincaKolonisiCalistir, genetikAlgoritmayiCalistir, pekisirmeliOgrenmeCalistir } from "./services/algoritmalar";
@@ -71,11 +71,18 @@ const App: React.FC = () => {
 
                 const dugumler = nodeLines.map((line, idx) => {
                     const [id, s_ms, r_node] = line.split(';');
-                    // Koordinatlar WorldMap componentinde Fibonacci küresi ile atanacak (sabitVeri)
-                    // Burada sadece ham veriyi parse ediyoruz.
+
+                    // Fibonacci Küresi Koordinat Hesabı
+                    // Algoritmalar (özellikle ACO/ABC) mesafe bazlı sezgiseller kullanabilsin diye koordinatları burada öğretiyoruz.
+                    const phi = Math.acos(1 - 2 * (idx + 0.5) / nodeLines.length);
+                    const theta = Math.PI * (1 + Math.sqrt(5)) * idx;
+                    const R = 75; // Yörünge Yarıçapı
+
                     return {
                         id: parseInt(id),
-                        x: 0, y: 0, z: 0, // Placeholder
+                        x: R * Math.sin(phi) * Math.cos(theta),
+                        y: R * Math.sin(phi) * Math.sin(theta),
+                        z: R * Math.cos(phi),
                         processingDelay: parseFloat(s_ms.replace(',', '.')),
                         reliability: parseFloat(r_node.replace(',', '.'))
                     };
