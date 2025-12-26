@@ -81,9 +81,37 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
     const grafikReferansi = useRef<ForceGraphMethods>();
     const sahneHazir = useRef(false);
 
-    // 3. OPTİMİZASYON: TOOLTIP REFERANSI (State yerine Ref)
-    // React render döngüsüne girmeden doğrudan DOM manipülasyonu yapacağız.
-    const tooltipRef = useRef<HTMLDivElement>(null);
+    // 3. OPTİMİZASYON: TOOLTIP (State yerine Ref + Manuel DOM)
+    // React'in node removal hatasını önlemek için (removeChild error)
+    // Tooltip elementini React DOM dışında tamamen manuel yönetiyoruz.
+    const tooltipRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        // Tooltip elementini yarat
+        const el = document.createElement('div');
+        el.style.position = 'fixed';
+        el.style.display = 'none';
+        el.style.backgroundColor = 'rgba(0, 0, 0, 0.95)';
+        el.style.color = '#fff';
+        el.style.padding = '8px 12px';
+        el.style.borderRadius = '6px';
+        el.style.fontSize = '12px';
+        el.style.pointerEvents = 'none';
+        el.style.zIndex = '9999';
+        el.style.border = '1px solid #475569';
+        el.style.boxShadow = '0 4px 6px rgba(0,0,0,0.5)';
+        el.style.minWidth = '150px';
+
+        document.body.appendChild(el);
+        tooltipRef.current = el;
+
+        return () => {
+            // Cleanup: Unmount sırasında güvenli bir şekilde kaldır
+            if (document.body.contains(el)) {
+                document.body.removeChild(el);
+            }
+        };
+    }, []);
 
     // 1. HIZLI ARAMA KÜMESİ
     const yolKumesi = useMemo(() => new Set(yolSonucu), [yolSonucu]);
@@ -144,8 +172,9 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
     const ortakHitboxGeo = useMemo(() => new THREE.CylinderGeometry(6, 6, 1, 4).rotateZ(Math.PI / 2), []);
 
     const baglantiObjesiGetir = useCallback((baglanti: any) => {
-        // GÖRÜNMEYENLER İÇİN BOŞ NESNE (RAM TASARRUFU)
-        if (!baglantiYoldaMi(baglanti)) return BOS_NESNE;
+        // PERFORMANS İÇİN: Görünmeyen linkleri HİÇ render etme (null dön)
+        // 'undefined' dönersek varsayılan çizgiyi çizer (GPU yükü bindirir)
+        if (!baglantiYoldaMi(baglanti)) return null as unknown as THREE.Object3D;
 
         const grup = new THREE.Group();
         // Görünür X-Ray Mesh (Shared Geometry & Material)
@@ -177,8 +206,8 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         return false;
     }, [baglantiYoldaMi]);
 
-    const baglantiGenisligiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0, [baglantiYoldaMi]);
-    const baglantiRengiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? "transparent" : "transparent", [baglantiYoldaMi]);
+    const baglantiGenisligiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0, [baglantiYoldaMi]); // Arka plan 0 genişlik
+    const baglantiRengiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? "transparent" : "rgba(0,0,0,0)", [baglantiYoldaMi]); // Tamamen görünmez
     const baglantiEgrilikGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0.1, [baglantiYoldaMi]);
 
     const parcacikHiziGetir = useCallback((baglanti: any) => {
@@ -194,7 +223,7 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
         const renderer = fg.renderer();
         if (renderer) {
             renderer.outputColorSpace = THREE.SRGBColorSpace;
-            renderer.setPixelRatio(1);
+            renderer.setPixelRatio(1); // Yüksek DPI ekranlarda kasmayı önle
             renderer.shadowMap.enabled = false;
         }
 
@@ -340,7 +369,7 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
                 nodeRelSize={2.5}
                 nodeColor={dugumRengiGetir}
                 nodeLabel={(node: any) => `Node ${node.id}`}
-                nodeResolution={6}
+                nodeResolution={4} // OPTİMİZASYON: Poligon sayısı düşürüldü (6 -> 4)
 
                 linkWidth={baglantiGenisligiGetir}
                 linkColor={baglantiRengiGetir}
@@ -348,7 +377,7 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
 
                 linkDirectionalParticles={0}
                 linkDirectionalParticleWidth={5}
-                linkDirectionalParticleResolution={8}
+                linkDirectionalParticleResolution={4} // OPTİMİZASYON: Parçacık kalitesi düşürüldü (8 -> 4)
                 linkDirectionalParticleColor={() => "#ffffff"}
                 linkDirectionalParticleSpeed={parcacikHiziGetir}
 
@@ -358,24 +387,7 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
                 onLinkHover={baglantiUzerineGelme}
             />
 
-            {/* REACT TARAFINDAN YÖNETİLMEYEN, MANUEL GÜNCELLENEN TOOLTIP DOM'U */}
-            <div
-                ref={tooltipRef}
-                style={{
-                    position: 'fixed',
-                    display: 'none',
-                    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-                    color: '#fff',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    pointerEvents: 'none',
-                    zIndex: 9999,
-                    border: '1px solid #475569',
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.5)',
-                    minWidth: '150px'
-                }}
-            />
+
 
 
         </div>
