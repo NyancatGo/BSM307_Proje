@@ -300,6 +300,10 @@ const App: React.FC = () => {
         const kalan = 1 - yeniDeger;
 
         let yeniAgirliklar = { ...agirliklar };
+        // DİNAMİK AĞIRLIK DENGELEME (DYNAMIC WEIGHT BALANCING)
+        // Kullanıcı bir parametrenin ağırlığını değiştirdiğinde, toplam ağırlığın
+        // 1.0 (veya %100) olarak korunması için diğer parametreler orantılı olarak yeniden hesaplanır.
+        // Bu işlem QoS (Quality of Service) tutarlılığını sağlar.
 
         if (tip === "gecikme") {
             yeniAgirliklar.wGecikme = yeniDeger;

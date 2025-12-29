@@ -50,13 +50,15 @@ export const kimlikGetir = (dugum: any): number => {
 };
 
 /**
- * İstatistiksel verileri hesaplar (Min, Max, Ortalama, Standart Sapma).
- * Deney sonuçlarını analiz etmek için kullanılır.
+ * İSTATİSTİKSEL ANALİZ MODÜLÜ
+ * Bu fonksiyon, elde edilen sonuçların (gecikme, maliyet vb.) dağılım özelliklerini hesaplar.
+ * Ortalama, minimum, maksimum ve standart sapma değerlerini döndürür.
+ * Standart sapma, algoritmanın kararlılığını (sonuçların tutarlılığını) ölçmek için kritik bir metriktir.
  */
 export const istatistikHesapla = (degerler: number[]) => {
     if (degerler.length === 0) return { ortalama: 0, stdSapma: 0, min: 0, max: 0 };
     const ortalama = degerler.reduce((a, b) => a + b, 0) / degerler.length;
-    // Standart Sapma (Standard Deviation - Population)
+    // Standart Sapma: Verilerin ortalamadan ne kadar saptığını gösterir. Düşük değer yüksek kararlılık anlamına gelir.
     const stdSapma = Math.sqrt(degerler.map(x => Math.pow(x - ortalama, 2)).reduce((a, b) => a + b, 0) / degerler.length);
     return { ortalama, stdSapma, min: Math.min(...degerler), max: Math.max(...degerler) };
 };
@@ -99,14 +101,17 @@ export const baglantiKontrol = (cizge: CizgeVerisi, baslangic: number, bitis: nu
  * @param cizge Graf verisi
  */
 /**
- * Bir yolun (path) metriklerini (gecikme, güvenilirlik, maliyet) hesaplar.
- * @param yol Node ID'lerinden oluşan sıralı liste
- * @param cizge Graf verisi
- * @param baglantiHaritasi Hızlı erişim için link haritası (Opsiyonel, performans için önerilir)
+ * METRİK VE MALİYET ANALİZ FONKSİYONU
+ * Verilen bir yolun (Path) performans metriklerini hesaplar.
+ * - Toplam Gecikme (Latency)
+ * - Toplam Güvenilirlik (Reliability)
+ * - Kaynak Maliyeti (Resource Cost)
+ * 
+ * NOT: Bu fonksiyon ham metrikleri çıkarır. Ağırlıklandırma işlemi 'agirlikliMaliyetHesapla' fonksiyonunda yapılır.
  */
 const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi, baglantiHaritasi?: Map<string, Baglanti>) => {
     let toplamGecikme = 0;
-    let toplamLogGuvenilirlik = 0; // Logaritmik Toplam (Çarpım işlemini toplama dönüştürmek için)
+    let toplamLogGuvenilirlik = 0; // İşlem kolaylığı için logaritmik toplama yöntemi kullanılır.
     let toplamKaynakMaliyeti = 0;
     let hamGuvenilirlik = 1.0;
 
@@ -114,37 +119,31 @@ const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi, baglantiHarit
         const u = yol[i];
         const v = yol[i + 1];
 
-        // İki düğüm arasındaki bağlantıyı (Link) ve hedef düğümü (Node) buluyoruz
+        // VERİ ERİŞİM OPTİMİZASYONU (O(1) Lookup)
+        // Bağlantı verilerine erişmek için Hash Map yapısı kullanılır, bu sayede döngü içi arama maliyeti minimize edilir.
         let baglanti: Baglanti | undefined;
 
         if (baglantiHaritasi) {
-            // O(1) Erişim
             baglanti = baglantiHaritasi.get(`${u}-${v}`) || baglantiHaritasi.get(`${v}-${u}`);
         } else {
-            // O(N) Erişim (Fallback)
+            // Harita mevcut değilse lineer arama yapılır (O(N) Fallback)
             baglanti = cizge.links.find(l => (l.source === u && l.target === v) || (l.source === v && l.target === u));
         }
 
         const hedefDugum = cizge.nodes.find(n => n.id === v);
 
         if (baglanti && hedefDugum) {
-            // A) GECİKME (Delay): Link İletim Süresi + Hedef Düğüm İşlem Süresi
+            // 1. GECİKME: İletim gecikmesi ve düğüm işlem süresi toplanır.
             toplamGecikme += baglanti.propagationDelay + (hedefDugum.processingDelay || 0);
 
-            // A) GECİKME (Delay): Link İletim Süresi + Hedef Düğüm İşlem Süresi
-            toplamGecikme += baglanti.propagationDelay + (hedefDugum.processingDelay || 0);
-
-            // B) GÜVENİLİRLİK (Reliability): Logaritmik Dönüşüm
-            // Pre-calculation varsayımı: baglanti.logReliability varsa kullan, yoksa hesapla
+            // 2. GÜVENİLİRLİK: Önceden hesaplanmış Logaritmik değerler kullanılır (CPU Optimizasyonu).
             const logRel = baglanti.logReliability ?? -Math.log(Math.max(0.0001, baglanti.reliability || 0.99));
-            // Node reliability sabit kabul edilebilir veya ihmal edilebilir, ama burada hesaplıyoruz
             const dGuven = Math.max(0.0001, hedefDugum.reliability || 0.99);
 
             toplamLogGuvenilirlik += logRel + (-Math.log(dGuven));
             hamGuvenilirlik *= ((baglanti.reliability || 0.99) * dGuven);
 
-            // C) KAYNAK KULLANIMI (Resource Cost): Bant Genişliği ile Ters Orantılı
-            // Pre-calculation varsa kullan
+            // 3. MALİYET: Bant genişliği ile ters orantılıdır (Yüksek bant genişliği = Düşük birim maliyet).
             toplamKaynakMaliyeti += baglanti.resourceCost ?? (1000 / (baglanti.bandwidth || 100));
         }
     }
@@ -159,26 +158,31 @@ const yolMetrikleriniHesapla = (yol: number[], cizge: CizgeVerisi, baglantiHarit
     };
 };
 
-// Yardımcı: Hızlı Bağlantı Haritası Oluşturucu (Pre-Calculation Dahil)
+// PERFORMANS OPTİMİZASYONU: ÖN HESAPLAMA VE HIZLI ERİŞİM HARİTASI
+// Hesaplama yoğunluğunu azaltmak için (Logaritma, Bölme vb.) işlemler önceden yapılır (Pre-calculation).
+// Ayrıca O(1) erişim süresi için HashMap yapısı oluşturulur.
 const haritaOlustur = (links: Baglanti[]): Map<string, Baglanti> => {
     const map = new Map<string, Baglanti>();
     links.forEach(l => {
-        // Pre-calculation (Ön Hesaplama)
-        // Bu değerler döngü içinde milyonlarca kez tekrar hesaplanmaz, burada bir kere hesaplanır.
+        // ÖN HESAPLAMA (PRE-CALCULATION)
+        // Algoritma esnasında tekrarlanan matematiksel işlemler burada bir kez yapılır ve saklanır.
         const logRel = -Math.log(Math.max(0.0001, l.reliability || 0.99));
         const resCost = 1000 / (l.bandwidth || 100);
 
         const linkWithMets = { ...l, logReliability: logRel, resourceCost: resCost };
 
         map.set(`${l.source}-${l.target}`, linkWithMets);
-        // Yönsüz graf varsayımıyla ters yönü de ekle
+        // Yönsüz graf varsayımı ile ters yön de eklenir.
         map.set(`${l.target}-${l.source}`, linkWithMets);
     });
     return map;
 };
 
 /**
- * Hesaplanan metrikleri kullanıcı ağırlıklarına göre tek bir skor (Weighted Cost) haline getirir.
+ * AĞIRLIKLI MALİYET HESAPLAMA (WEIGHTED COST FUNCTION)
+ * Kullanıcı tarafından belirlenen ağırlık katsayılarını (QoS Gereksinimleri) kullanarak
+ * her yol için tek bir başarı puanı (Score) üretir.
+ * - Amaç: Minimum maliyet değerine ulaşmaktır (Minimizasyon Problemi).
  */
 const agirlikliMaliyetHesapla = (metrikler: any, parametreler: AlgoritmaParametreleri) => {
     const wD = parametreler.wGecikme ?? 0.33;
@@ -186,7 +190,7 @@ const agirlikliMaliyetHesapla = (metrikler: any, parametreler: AlgoritmaParametr
     const wK = parametreler.wKaynak ?? 0.33;
 
     const toplamAgirlik = wD + wR + wK;
-    // Eğer hepsi 0 ise eşit kabul et, yoksa orantıla (Normalizasyon)
+    // NORMALİZASYON: Ağırlıkların toplamı 1 olacak şekilde normalize edilir.
     const normD = toplamAgirlik === 0 ? 0.33 : wD / toplamAgirlik;
     const normR = toplamAgirlik === 0 ? 0.33 : wR / toplamAgirlik;
     const normK = toplamAgirlik === 0 ? 0.33 : wK / toplamAgirlik;
@@ -195,7 +199,7 @@ const agirlikliMaliyetHesapla = (metrikler: any, parametreler: AlgoritmaParametr
         (normD * metrikler.totalDelay) +
         (normR * metrikler.totalLogRel * 100) +
         (normK * metrikler.resourceCost) +
-        // ✂️ MAKAS: Her zıplama +50 ceza puanı (Kestirme yol zorlaması).
+        // HOP CEZASI (PENALTY): Gereksiz uzun yolları (fazla düğüm sayısı) engellemek için ceza puanı eklenir.
         ((metrikler.hopCount || 0) * 50)
     );
 };
@@ -223,7 +227,13 @@ export const genetikAlgoritmayiCalistir = (
     const rng = new TohumluRNG(parametreler.seed ?? Math.floor(Math.random() * 99999));
     const baglantiHaritasi = haritaOlustur(cizge.links);
 
-    // Rastgele Yol Üretici
+    // Hedef düğümün koordinatlarını buluyoruz
+    const hedefNode = cizge.nodes.find(n => n.id === bitisDugum);
+
+    // OPTİMİZE EDİLMİŞ BAŞLANGIÇ POPÜLASYONU (HEURISTIC INITIALIZATION)
+    // Geleneksel GA'nın aksine, başlangıç popülasyonu tamamen rastgele oluşturulmaz.
+    // Hedefe yakınlığı (Distance Heuristic) göz önüne alarak "kaliteli" adaylarla başlanır.
+    // Bu yöntem, algoritmanın yakınsama (convergence) hızını artırır.
     const rastgeleYolOlustur = (): number[] => {
         let yol = [baslangicDugum];
         let suanki = baslangicDugum;
@@ -231,19 +241,48 @@ export const genetikAlgoritmayiCalistir = (
         let deneme = 0;
 
         while (suanki !== bitisDugum && deneme < 100) {
+            deneme++;
             const komsular = cizge.links
                 .filter(l => l.source === suanki || l.target === suanki)
                 .map(l => l.source === suanki ? l.target : l.source);
 
+            // Ziyaret edilmemiş geçerli komşular
             const gecerli = komsular.filter(n => !ziyaretEdilen.has(n));
 
             if (gecerli.length === 0) break; // Çıkmaz sokak
 
-            const sonraki = rng.secim(gecerli);
+            // --- SEZGİSEL YÖNLENDİRME (HEURISTIC GUIDANCE) ---
+            // Rastgele seçim yerine, hedefe olan mesafeye dayalı olasılıksal seçim yapılır.
+
+            // 1. Uygunluk Değeri (Fitness Score): 1 / Mesafe^4
+            // Hedefe yakın düğümlerin seçilme olasılığı üstel olarak artar.
+            const adaylar = gecerli.map(k => {
+                const k_node = cizge.nodes.find(n => n.id === k);
+                const dist = (k_node && hedefNode) ? mesafeHesapla(k_node, hedefNode) : 99999;
+                return { id: k, score: Math.pow(1 / (dist + 1), 4) };
+            });
+
+            // 2. Rulet Seçimi
+            const toplamSkor = adaylar.reduce((sum, item) => sum + item.score, 0);
+            let sans = rng.siradaki() * toplamSkor;
+            let sonraki = gecerli[0];
+
+            for (const aday of adaylar) {
+                sans -= aday.score;
+                if (sans <= 0) {
+                    sonraki = aday.id;
+                    break;
+                }
+            }
+
+            // 3. Mutasyon (%20 Rastgelelik) - Genetik Çeşitlilik İçin Şart
+            if (rng.siradaki() < 0.2) {
+                sonraki = rng.secim(gecerli);
+            }
+
             yol.push(sonraki);
             ziyaretEdilen.add(sonraki);
             suanki = sonraki;
-            deneme++;
         }
         return suanki === bitisDugum ? yol : [];
     };
@@ -354,14 +393,17 @@ export const karincaKolonisiCalistir = (
 
                 if (komsular.length === 0) break;
 
-                // Olasılık Hesabı (Feromon * Sezgisel)
+                // OLASILIKSAL GEÇİŞ FONKSİYONU (PROBABILISTIC TRANSITION)
+                // Karıncanın bir sonraki düğümü seçme olasılığı iki faktöre bağlıdır:
+                // 1. Feromon Miktarı (Tau): Geçmiş tecrübelerden gelen bilgi.
+                // 2. Sezgisel Bilgi (Eta): Hedefe olan fiziksel yakınlık (1/Distance).
                 const olasiliklar = komsular.map(n => {
                     const tau = feromonGetir(suanki, n);
                     const hedefD = cizge.nodes.find(node => node.id === bitisDugum);
                     const komsuD = cizge.nodes.find(node => node.id === n);
                     const mesafe = (hedefD && komsuD) ? mesafeHesapla(komsuD, hedefD) : 1;
-                    const eta = 1 / (mesafe + 0.1);
-                    return Math.pow(tau, 1.0) * Math.pow(eta, 2.0); // Beta=2
+                    const eta = 1 / (mesafe + 0.1); // Kısa mesafe avantaj sağlar.
+                    return Math.pow(tau, 1.0) * Math.pow(eta, 2.0); // Sezgisel bilgiye (Eta) ağırlık verilmiştir (Beta=2).
                 });
 
                 const toplamOlasilik = olasiliklar.reduce((a, b) => a + b, 0);
@@ -436,7 +478,26 @@ export const pekisirmeliOgrenmeCalistir = (
     const baglantiHaritasi = haritaOlustur(cizge.links);
 
     const Q = new Map<string, number>(); // Q-Tablosu
-    const qGetir = (s: number, a: number) => Q.get(`${s}-${a}`) || 0.0;
+
+    // SEZGİSEL Q-DEĞERİ BAŞLATMA (HEURISTIC Q-INITIALIZATION)
+    // Standart Q-Learning'de başlangıç değerleri 0'dır (Cold Start).
+    // Burada ise, henüz ziyaret edilmemiş durumlara hedefe olan mesafeye göre tahmini bir Q değeri atanır.
+    // Bu yöntem ajanın keşif sürecini (Exploration) hedefe doğru yönlendirir.
+    const hedefNode = cizge.nodes.find(n => n.id === bitisDugum);
+
+    const qGetir = (s: number, a: number) => {
+        if (Q.has(`${s}-${a}`)) return Q.get(`${s}-${a}`)!;
+
+        // HİÇ GİDİLMEMİŞ ROTA İÇİN TAHMİN (Heuristic)
+        const nodeA = cizge.nodes.find(n => n.id === a);
+        if (nodeA && hedefNode) {
+            const mesafe = mesafeHesapla(nodeA, hedefNode);
+            // Hedefe yakınsa yüksek (100), uzaksa düşük puan ver.
+            return 1000 / (mesafe + 1);
+        }
+        return 0.0;
+    };
+
     const qAta = (s: number, a: number, deger: number) => Q.set(`${s}-${a}`, deger);
 
     for (let bolum = 0; bolum < (parametreler.iterations || 500); bolum++) {
@@ -559,24 +620,76 @@ export const yapayAriKolonisiCalistir = (
     let enIyiYol: number[] = [];
     let minimumMaliyet = Infinity;
 
+    // Hedef düğümün koordinatlarını buluyoruz (Arılar yönünü bilsin diye)
+    const hedefNode = cizge.nodes.find(n => n.id === bitisDugum);
+
+    // AĞIRLIKLI RASTGELE YÜRÜYÜŞ (WEIGHTED RANDOM WALK)
+    // Standart rastgele yürüyüş yerine, hedefe daha yakın düğümlerin seçilme ihtimali yüksektir.
+    // Bu, arıların arama uzayını (Search Space) daha verimli kullanmasını sağlar.
     const rastgeleYolUret = (): number[] => {
         let yol = [baslangicDugum];
         let suanki = baslangicDugum;
         let ziyaret = new Set([baslangicDugum]);
-        while (suanki !== bitisDugum) {
+        let denemeSayisi = 0;
+
+        // Sonsuz döngü koruması
+        while (suanki !== bitisDugum && denemeSayisi < 100) {
+            denemeSayisi++;
+
             const komsular = cizge.links
                 .filter(l => l.source === suanki || l.target === suanki)
                 .map(l => l.source === suanki ? l.target : l.source)
                 .filter(n => !ziyaret.has(n));
 
-            if (komsular.length === 0) return [];
-            const sonraki = rng.secim(komsular);
-            yol.push(sonraki);
-            ziyaret.add(sonraki);
-            suanki = sonraki;
-            if (yol.length > 50) return [];
+            if (komsular.length === 0) return []; // Çıkmaz sokak
+
+            // --- AKILLI SEÇİM MANTIĞI ---
+
+            // 1. Tüm komşuların hedefe olan kuş bakışı (3D) mesafesini ölçüyoruz.
+            // Arılar hedefe daha yakın olan çiçekleri (düğümleri) daha çok sever.
+            const adaylar = komsular.map(komsuId => {
+                const komsuNode = cizge.nodes.find(n => n.id === komsuId);
+                // Eğer node bulunamazsa uzakta varsay
+                const mesafe = (komsuNode && hedefNode) ? mesafeHesapla(komsuNode, hedefNode) : 99999;
+                return { id: komsuId, mesafe };
+            });
+
+            // 2. Bir "Çekim Gücü" (Fitness) puanı hesaplıyoruz.
+            // Formül: 1 / (Mesafe ^ 2)
+            // Bu formül sayesinde, hedefe yakın olanların seçilme şansı karesiyle artar.
+            // Yani arı, hedefe 10 metre uzaktaki çiçeği, 20 metre uzaktakine göre 4 kat daha çok ister.
+            const puanlar = adaylar.map(a => Math.pow(1 / (a.mesafe + 1), 4));
+
+            // 3. Rulet Tekerleği Yöntemi (Roulette Wheel Selection) ile seçim yapıyoruz.
+            // En yüksek puanlıyı kesin seçmeyiz (bu Genetic Algoritma olurdu), şans veririz.
+            // Böylece arı bazen yolu uzatsa da genellikle doğru yöne uçar.
+            const toplamPuan = puanlar.reduce((a, b) => a + b, 0);
+            let sans = rng.siradaki() * toplamPuan;
+            let secilen = komsular[0];
+
+            for (let i = 0; i < komsular.length; i++) {
+                sans -= puanlar[i];
+                if (sans <= 0) {
+                    secilen = komsular[i];
+                    break;
+                }
+            }
+
+            // 4. KAŞİFLİK RUHU (%20)
+            // Arılar bazen (%20 ihtimalle) kokuyu görmezden gelip tamamen rastgele uçarlar.
+            // Bu sayede "Local Optimum" denilen tuzak çukurlara düşmekten kurtulurlar.
+            // Eğer bunu yapmazsak arı bir duvara toslayıp orada kalabilir.
+            if (rng.siradaki() < 0.2) {
+                secilen = rng.secim(komsular);
+            }
+
+            yol.push(secilen);
+            ziyaret.add(secilen);
+            suanki = secilen;
+
+            if (yol.length > 50) return []; // Çok uzadıysa iptal et
         }
-        return yol;
+        return suanki === bitisDugum ? yol : [];
     };
 
     for (let i = 0; i < (parametreler.iterations || 50); i++) {
