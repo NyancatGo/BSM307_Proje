@@ -51,6 +51,7 @@ const App: React.FC = () => {
     // Hesaplama Sonuçları
     const [sonuc, setSonuc] = useState<YolSonucu | null>(null);
     const [hesaplamaYapiyor, setHesaplamaYapiyor] = useState(false);
+    const [goruntulenenSeed, setGoruntulenenSeed] = useState<number | null>(null);
 
     // UI Durumları
     const [ayarlarAcik, setAyarlarAcik] = useState(true);
@@ -196,7 +197,7 @@ const App: React.FC = () => {
 
     // Seçilen Algoritmayı Çalıştır
     // Web Worker ile Hesaplama (Promise Wrapper)
-    const calistirWorker = (algo: AlgoritmaTipi, g: CizgeVerisi, src: number, dst: number, w: Agirliklar): Promise<any> => {
+    const calistirWorker = (algo: AlgoritmaTipi, g: CizgeVerisi, src: number, dst: number, w: Agirliklar, seed: number): Promise<any> => {
         return new Promise((resolve, reject) => {
             // Webpack 5 / CRA 5 Compatible Worker Instantiation
             const worker = new Worker(new URL('./services/hesaplama.worker.ts', import.meta.url));
@@ -211,7 +212,8 @@ const App: React.FC = () => {
                 reject(err);
                 worker.terminate();
             };
-            worker.postMessage({ algo, cizge: g, src, dst, params: w });
+            // Seed değerini parametrelere ekleyip gönderiyoruz
+            worker.postMessage({ algo, cizge: g, src, dst, params: { ...w, seed } });
         });
     };
 
@@ -224,8 +226,12 @@ const App: React.FC = () => {
         await new Promise(r => setTimeout(r, 50));
 
         const aktifGraf = grafiFiltrele(graf, minBantGenisligi);
+        // Rastgele Seed Üretimi (Her tıklamada yeni şans)
+        const yeniSeed = Math.floor(Math.random() * 99999);
+        setGoruntulenenSeed(yeniSeed);
+
         try {
-            const sonuc = await calistirWorker(seciliAlgoritma, aktifGraf, baslangicDugum, bitisDugum, agirliklar);
+            const sonuc = await calistirWorker(seciliAlgoritma, aktifGraf, baslangicDugum, bitisDugum, agirliklar, yeniSeed);
             setSonuc(sonuc);
             setKiyaslamaGoster(false);
             setSonuclarAcik(true);
@@ -259,7 +265,8 @@ const App: React.FC = () => {
                     // Daha mantıklı paralellik: Her algoritma tek bir worker'da çalışsın.
                     // 3 kere çalıştırıp en iyisini seçmek yerine, algoritma içindeki iterasyon sayısını artırabiliriz.
                     // Burada thread sayısını düşürmek için tek seferlik koşum yapıyoruz.
-                    const enIyi = await calistirWorker(algo, aktifGraf, baslangicDugum, bitisDugum, agirliklar);
+                    const seed = Math.floor(Math.random() * 99999);
+                    const enIyi = await calistirWorker(algo, aktifGraf, baslangicDugum, bitisDugum, agirliklar, seed);
 
                     let kisaAd = "??";
                     if (algo === AlgoritmaTipi.GENETIC) kisaAd = "GA";
@@ -578,6 +585,24 @@ const App: React.FC = () => {
 
                             {/* AKSİYON BUTONLARI */}
                             <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "8px" }}>
+
+                                {/* SEED GÖSTERGESİ (GÖRÜNÜR YER) */}
+                                {goruntulenenSeed !== null && (
+                                    <div style={{
+                                        textAlign: 'right',
+                                        fontSize: '11px',
+                                        color: '#9ca3af',
+                                        fontFamily: 'monospace',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        alignSelf: 'flex-end',
+                                        border: '1px solid #374151'
+                                    }}>
+                                        SEED: <span style={{ color: '#fff' }}>{goruntulenenSeed}</span>
+                                    </div>
+                                )}
+
                                 <button
                                     onClick={hesaplaButonunaBasildi}
                                     disabled={hesaplamaYapiyor}
@@ -623,7 +648,6 @@ const App: React.FC = () => {
                                         justifyContent: "center",
                                         alignItems: "center",
                                         gap: "8px",
-                                        transition: "background 0.2s"
                                     }}
                                 >
                                     <ChartBarIcon style={{ width: "18px", color: "#fbbf24" }} /> Algoritmaları Yarıştır
@@ -659,173 +683,175 @@ const App: React.FC = () => {
             {testModuGoster && graf && <DeneyYurutucu cizge={graf} />}
 
             {/* SAĞ PANEL: SONUÇLAR */}
-            {sonuc && (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: "100px",
-                        right: sonuclarAcik ? "20px" : "-400px",
-                        zIndex: 20,
-                        width: "420px", // Genişletildi (350 -> 420)
-                        maxHeight: "90vh", // Dikey taşmayı önle
-                        overflowY: "auto", // Scroll ekle
-                        backgroundColor: "rgba(15, 23, 42, 0.95)",
-                        backdropFilter: "blur(12px)",
-                        border: "1px solid #334155",
-                        borderRadius: "12px",
-                        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                        transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                        color: "white"
-                    }}
-                >
-                    {/* Toggle Button */}
+            {
+                sonuc && (
                     <div
-                        onClick={() => setSonuclarAcik(!sonuclarAcik)}
                         style={{
                             position: "absolute",
-                            left: "-40px",
-                            top: "20px",
-                            width: "40px",
-                            height: "40px",
-                            backgroundColor: "#334155",
-                            borderRadius: "8px 0 0 8px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            boxShadow: "-4px 0 6px rgba(0,0,0,0.1)",
-                            border: "1px solid #475569",
-                            borderRight: "none"
+                            top: "100px",
+                            right: sonuclarAcik ? "20px" : "-400px",
+                            zIndex: 20,
+                            width: "420px", // Genişletildi (350 -> 420)
+                            maxHeight: "90vh", // Dikey taşmayı önle
+                            overflowY: "auto", // Scroll ekle
+                            backgroundColor: "rgba(15, 23, 42, 0.95)",
+                            backdropFilter: "blur(12px)",
+                            border: "1px solid #334155",
+                            borderRadius: "12px",
+                            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+                            transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                            color: "white"
                         }}
                     >
-                        {sonuclarAcik ? <ChevronDoubleRightIcon width={20} /> : <ChevronDoubleLeftIcon width={20} color="#4ade80" />}
-                    </div>
-
-                    {/* Header */}
-                    <div style={{ padding: "20px", borderBottom: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <h3 style={{ fontWeight: "bold", background: "linear-gradient(to right, #4ade80, #22c55e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: "18px", margin: 0 }}>
-                            🚀 Simülasyon Raporu
-                        </h3>
-                        <span style={{ fontSize: "10px", backgroundColor: "#1e293b", padding: "2px 6px", borderRadius: "4px", color: "#64748b" }}>CANLI</span>
-                    </div>
-
-                    {/* Content */}
-                    <div style={{ padding: "20px" }}>
-
-                        {/* Grafik veya Tekil Sonuç */}
-                        {kiyaslamaGoster && kiyaslamaVerisi.length > 0 ? (
-                            <div style={{ height: "180px", marginBottom: "20px", background: "rgba(0,0,0,0.2)", borderRadius: "8px", padding: "10px" }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={kiyaslamaVerisi}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tick={{ fill: '#94a3b8' }} />
-                                        <YAxis stroke="#94a3b8" fontSize={10} tick={{ fill: '#94a3b8' }} />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px", color: "#fff" }}
-                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                            formatter={(value: number) => value.toFixed(2)}
-                                            labelFormatter={(label: any) => {
-                                                // Tooltip'te uzun ismi göstermek için kiyaslamaVerisi'nden bul
-                                                const match = kiyaslamaVerisi.find(v => v.name === label);
-                                                return match ? match.fullName : label;
-                                            }}
-                                        />
-                                        <Bar
-                                            dataKey="cost"
-                                            radius={[4, 4, 0, 0]}
-                                            onClick={(data: any) => {
-                                                if (data && data.res) {
-                                                    setSonuc(data.res);
-                                                }
-                                            }}
-                                            onMouseEnter={(data: any) => {
-                                                if (data && data.res) {
-                                                    setSonuc(data.res);
-                                                }
-                                            }}
-                                            style={{ cursor: "pointer" }}
-                                        >
-                                            {kiyaslamaVerisi.map((entry, index) => (
-                                                <Cell
-                                                    key={`cell-${index}`}
-                                                    fill={entry.color}
-                                                    stroke={sonuc?.algorithmName === entry.name ? "white" : "transparent"}
-                                                    strokeWidth={2}
-                                                />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
-                                <div style={{ background: "linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9))", padding: "12px", borderRadius: "8px", border: "1px solid #334155", textAlign: "center", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
-                                    <div style={{ fontSize: "11px", color: "#94a3b8", textTransform: 'uppercase', marginBottom: '4px' }}>Algoritma</div>
-                                    <div style={{ fontWeight: "700", color: "#fff", fontSize: "14px" }}>{sonuc.algorithmName}</div>
-                                </div>
-                                <div style={{ background: "linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9))", padding: "12px", borderRadius: "8px", border: "1px solid #334155", textAlign: "center", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
-                                    <div style={{ fontSize: "11px", color: "#94a3b8", textTransform: 'uppercase', marginBottom: '4px' }}>Süre</div>
-                                    <div style={{ fontWeight: "bold", fontSize: "18px", color: "#38bdf8" }}>{sonuc.executionTime.toFixed(0)} <span style={{ fontSize: "12px" }}>ms</span></div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Detaylı Metrikler */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #3b82f6" }}>
-                                <div>
-                                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>Toplam Gecikme</div>
-                                    <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Delay</div>
-                                </div>
-                                <span style={{ fontFamily: "monospace", color: "#60a5fa", fontSize: "15px", fontWeight: "bold" }}>{sonuc.metrics.totalDelay.toFixed(2)} ms</span>
-                            </div>
-
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #4ade80" }}>
-                                <div>
-                                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>Güvenilirlik</div>
-                                    <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Reliability</div>
-                                </div>
-                                <span style={{ fontFamily: "monospace", color: "#4ade80", fontSize: "15px", fontWeight: "bold" }}>{(sonuc.metrics.totalReliability * 100).toFixed(6)}%</span>
-                            </div>
-
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #c084fc" }}>
-                                <div>
-                                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>Kaynak Tüketimi</div>
-                                    <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Resource Cost</div>
-                                </div>
-                                <span style={{ fontFamily: "monospace", color: "#c084fc", fontSize: "15px", fontWeight: "bold" }}>{sonuc.metrics.resourceCost.toFixed(2)}</span>
-                            </div>
-
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #facc15" }}>
-                                <div>
-                                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>Genel Skor</div>
-                                    <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Weighted Cost</div>
-                                </div>
-                                <span style={{ fontFamily: "monospace", color: "#facc15", fontSize: "15px", fontWeight: "bold" }}>{sonuc.metrics.weightedCost.toFixed(4)}</span>
-                            </div>
+                        {/* Toggle Button */}
+                        <div
+                            onClick={() => setSonuclarAcik(!sonuclarAcik)}
+                            style={{
+                                position: "absolute",
+                                left: "-40px",
+                                top: "20px",
+                                width: "40px",
+                                height: "40px",
+                                backgroundColor: "#334155",
+                                borderRadius: "8px 0 0 8px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                boxShadow: "-4px 0 6px rgba(0,0,0,0.1)",
+                                border: "1px solid #475569",
+                                borderRight: "none"
+                            }}
+                        >
+                            {sonuclarAcik ? <ChevronDoubleRightIcon width={20} /> : <ChevronDoubleLeftIcon width={20} color="#4ade80" />}
                         </div>
 
-                        {/* Rota (Node Listesi) */}
-                        <div style={{ marginTop: "20px" }}>
-                            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px", textTransform: "uppercase" }}>Hesaplanan Rota:</div>
-                            <div style={{
-                                backgroundColor: "rgba(0,0,0,0.3)",
-                                padding: "10px",
-                                borderRadius: "6px",
-                                fontFamily: "monospace",
-                                fontSize: "11px",
-                                color: "#cbd5e1",
-                                border: "1px solid #334155",
-                                wordBreak: "break-all",
-                                lineHeight: "1.5"
-                            }}>
-                                {sonuc.path.join(" → ")}
+                        {/* Header */}
+                        <div style={{ padding: "20px", borderBottom: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <h3 style={{ fontWeight: "bold", background: "linear-gradient(to right, #4ade80, #22c55e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: "18px", margin: 0 }}>
+                                🚀 Simülasyon Raporu
+                            </h3>
+                            <span style={{ fontSize: "10px", backgroundColor: "#1e293b", padding: "2px 6px", borderRadius: "4px", color: "#64748b" }}>CANLI</span>
+                        </div>
+
+                        {/* Content */}
+                        <div style={{ padding: "20px" }}>
+
+                            {/* Grafik veya Tekil Sonuç */}
+                            {kiyaslamaGoster && kiyaslamaVerisi.length > 0 ? (
+                                <div style={{ height: "180px", marginBottom: "20px", background: "rgba(0,0,0,0.2)", borderRadius: "8px", padding: "10px" }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={kiyaslamaVerisi}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tick={{ fill: '#94a3b8' }} />
+                                            <YAxis stroke="#94a3b8" fontSize={10} tick={{ fill: '#94a3b8' }} />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px", color: "#fff" }}
+                                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                                formatter={(value: number) => value.toFixed(2)}
+                                                labelFormatter={(label: any) => {
+                                                    // Tooltip'te uzun ismi göstermek için kiyaslamaVerisi'nden bul
+                                                    const match = kiyaslamaVerisi.find(v => v.name === label);
+                                                    return match ? match.fullName : label;
+                                                }}
+                                            />
+                                            <Bar
+                                                dataKey="cost"
+                                                radius={[4, 4, 0, 0]}
+                                                onClick={(data: any) => {
+                                                    if (data && data.res) {
+                                                        setSonuc(data.res);
+                                                    }
+                                                }}
+                                                onMouseEnter={(data: any) => {
+                                                    if (data && data.res) {
+                                                        setSonuc(data.res);
+                                                    }
+                                                }}
+                                                style={{ cursor: "pointer" }}
+                                            >
+                                                {kiyaslamaVerisi.map((entry, index) => (
+                                                    <Cell
+                                                        key={`cell-${index}`}
+                                                        fill={entry.color}
+                                                        stroke={sonuc?.algorithmName === entry.name ? "white" : "transparent"}
+                                                        strokeWidth={2}
+                                                    />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+                                    <div style={{ background: "linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9))", padding: "12px", borderRadius: "8px", border: "1px solid #334155", textAlign: "center", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8", textTransform: 'uppercase', marginBottom: '4px' }}>Algoritma</div>
+                                        <div style={{ fontWeight: "700", color: "#fff", fontSize: "14px" }}>{sonuc.algorithmName}</div>
+                                    </div>
+                                    <div style={{ background: "linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9))", padding: "12px", borderRadius: "8px", border: "1px solid #334155", textAlign: "center", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8", textTransform: 'uppercase', marginBottom: '4px' }}>Süre</div>
+                                        <div style={{ fontWeight: "bold", fontSize: "18px", color: "#38bdf8" }}>{sonuc.executionTime.toFixed(0)} <span style={{ fontSize: "12px" }}>ms</span></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Detaylı Metrikler */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #3b82f6" }}>
+                                    <div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>Toplam Gecikme</div>
+                                        <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Delay</div>
+                                    </div>
+                                    <span style={{ fontFamily: "monospace", color: "#60a5fa", fontSize: "15px", fontWeight: "bold" }}>{sonuc.metrics.totalDelay.toFixed(2)} ms</span>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #4ade80" }}>
+                                    <div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>Güvenilirlik</div>
+                                        <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Reliability</div>
+                                    </div>
+                                    <span style={{ fontFamily: "monospace", color: "#4ade80", fontSize: "15px", fontWeight: "bold" }}>{(sonuc.metrics.totalReliability * 100).toFixed(6)}%</span>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #c084fc" }}>
+                                    <div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>Kaynak Tüketimi</div>
+                                        <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Resource Cost</div>
+                                    </div>
+                                    <span style={{ fontFamily: "monospace", color: "#c084fc", fontSize: "15px", fontWeight: "bold" }}>{sonuc.metrics.resourceCost.toFixed(2)}</span>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(30,41,59,0.4)", borderRadius: "8px", borderLeft: "4px solid #facc15" }}>
+                                    <div>
+                                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>Genel Skor</div>
+                                        <div style={{ fontWeight: "600", color: "#e2e8f0" }}>Weighted Cost</div>
+                                    </div>
+                                    <span style={{ fontFamily: "monospace", color: "#facc15", fontSize: "15px", fontWeight: "bold" }}>{sonuc.metrics.weightedCost.toFixed(4)}</span>
+                                </div>
+                            </div>
+
+                            {/* Rota (Node Listesi) */}
+                            <div style={{ marginTop: "20px" }}>
+                                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px", textTransform: "uppercase" }}>Hesaplanan Rota:</div>
+                                <div style={{
+                                    backgroundColor: "rgba(0,0,0,0.3)",
+                                    padding: "10px",
+                                    borderRadius: "6px",
+                                    fontFamily: "monospace",
+                                    fontSize: "11px",
+                                    color: "#cbd5e1",
+                                    border: "1px solid #334155",
+                                    wordBreak: "break-all",
+                                    lineHeight: "1.5"
+                                }}>
+                                    {sonuc.path.join(" → ")}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

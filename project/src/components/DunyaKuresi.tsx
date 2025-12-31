@@ -209,7 +209,7 @@ const DunyaHaritasi: React.FC<DunyaHaritasiProps> = ({
     }, [baglantiYoldaMi]);
 
     const baglantiGenisligiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0, [baglantiYoldaMi]); // Arka plan 0 genişlik
-    const baglantiRengiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? "transparent" : "rgba(0,0,0,0)", [baglantiYoldaMi]); // Tamamen görünmez
+    const baglantiRengiGetir = useCallback((l: any) => baglantiYoldaMi(l) ? "transparent" : "rgba(105, 66, 66, 0)", [baglantiYoldaMi]); // Tamamen görünmez
     const baglantiEgrilikGetir = useCallback((l: any) => baglantiYoldaMi(l) ? 0 : 0.1, [baglantiYoldaMi]);
 
     const parcacikHiziGetir = useCallback((baglanti: any) => {

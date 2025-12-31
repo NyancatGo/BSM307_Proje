@@ -18,6 +18,8 @@ interface KosumMetrigi {
     basarili: boolean;
     gerekce?: string;
     agirliklar: { wGecikme: number, wGuven: number, wKaynak: number };
+    detaylar?: { delay: number, reliability: number, resourceCost: number };
+    seed: number;
 }
 
 // Deney Sonucu Veri Modeli
@@ -128,6 +130,7 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
     const [ilerleme, setIlerleme] = useState(0);
     const [gorunumModu, setGorunumModu] = useState<'tablo' | 'hatalar'>('tablo');
     const [seciliProfil, setSeciliProfil] = useState<keyof typeof AGIRLIK_PROFILLERI>('DENGELI');
+    const [sonIslenenSeed, setSonIslenenSeed] = useState<string>('-');
 
     const algoritmalar = [
         { tip: AlgoritmaTipi.GENETIC, isim: 'GA' },
@@ -143,34 +146,70 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
 
     const logEkle = (mesaj: string) => setLoglar(onceki => [...onceki.slice(-4), mesaj]);
 
-    const deneyleriBaslat = async () => {
+    const deneyleriBaslat = async (mod: 'random' | 'csv' = 'random') => {
         setCalisiyor(true);
         setSonuclar([]);
         setLoglar(['Yol Analizleri Başlatılıyor...']);
         setIlerleme(0);
         setGorunumModu('tablo');
 
+        // CSV Yükleme ve Parse İşlemi
+        let senaryoListesi: { s: number, d: number, bw: number }[] = [];
+
+        if (mod === 'csv') {
+            try {
+                setLoglar(prev => [...prev, "Veri seti indiriliyor: BSM307_317_Guz2025_TermProject_DemandData.csv"]);
+                const response = await fetch('/BSM307_317_Guz2025_TermProject_DemandData.csv');
+                if (!response.ok) throw new Error("CSV dosyası bulunamadı!");
+
+                const text = await response.text();
+                const lines = text.trim().split('\n'); // Satırlara ayır
+                // İlk satır header (src;dst;demand_mbps) olduğu için atla
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const parts = line.split(';');
+                    if (parts.length >= 3) {
+                        senaryoListesi.push({
+                            s: parseInt(parts[0]),
+                            d: parseInt(parts[1]),
+                            bw: parseInt(parts[2])
+                        });
+                    }
+                }
+                logEkle(`CSV Başarıyla Yüklendi: ${senaryoListesi.length} senaryo bulundu.`);
+            } catch (err) {
+                console.error(err);
+                logEkle("HATA: CSV dosyası okunamadı! Rastgele senaryolara dönülüyor.");
+                mod = 'random';
+            }
+        }
+
         setTimeout(async () => {
             const geciciSonuclar: TestSonucu[] = [];
             const N = cizge.nodes.length;
-            const TOPLAM_SENARYO = 20;
+            const TOPLAM_SENARYO = mod === 'csv' ? senaryoListesi.length : 20;
 
             for (let i = 0; i < TOPLAM_SENARYO; i++) {
-                let s = Math.floor(Math.random() * N);
-                let d = Math.floor(Math.random() * N);
-                // Aynı node olmasın ve node var olsun
-                while (d === s || !cizge.nodes[s] || !cizge.nodes[d]) {
+                let s, d, bantGenisligiTalebi;
+
+                if (mod === 'csv') {
+                    // CSV'den veriyi al
+                    s = senaryoListesi[i].s;
+                    d = senaryoListesi[i].d;
+                    bantGenisligiTalebi = senaryoListesi[i].bw;
+                } else {
+                    // Rastgele Üret
                     s = Math.floor(Math.random() * N);
                     d = Math.floor(Math.random() * N);
+                    while (d === s || !cizge.nodes[s] || !cizge.nodes[d]) {
+                        s = Math.floor(Math.random() * N);
+                        d = Math.floor(Math.random() * N);
+                    }
+                    bantGenisligiTalebi = Math.floor(Math.random() * 1000) + 1;
                 }
 
-                // 1. Kapasite Analizi
-                // const maxCap = maksimumKapasiteyiBul(cizge, s, d); // İstatistik için kullanılabilir
-
-                // 2. Talep Üretimi (0-1000 Mbps)
-                let bantGenisligiTalebi = Math.floor(Math.random() * 1000) + 1;
-
-                logEkle(`[${i + 1}/${TOPLAM_SENARYO}] S:${s}->D:${d} (İstenen:${bantGenisligiTalebi} Mbps)`);
+                logEkle(`[${i + 1}/${TOPLAM_SENARYO}] ${mod === 'csv' ? '(CSV)' : '(RND)'} S:${s}->D:${d} (İstenen:${bantGenisligiTalebi} Mbps)`);
 
                 const filtrelenmisGraf = grafiFiltrele(cizge, bantGenisligiTalebi);
                 const yolVarMi = baglantiKontrol(filtrelenmisGraf, s, d);
@@ -192,13 +231,17 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
 
                     for (let tekrar = 0; tekrar < 5; tekrar++) {
                         const baslamaT = performance.now();
+                        const seed = Math.floor(Math.random() * 99999);
+                        setSonIslenenSeed(seed.toString());
+                        const guncelParametreler = { ...mevcutAgirliklar, seed };
+
                         let sonuc;
                         try {
                             // Algoritma Seçimi ve Çalıştırma
-                            if (alg.tip === AlgoritmaTipi.GENETIC) sonuc = genetikAlgoritmayiCalistir(filtrelenmisGraf, s, d, mevcutAgirliklar);
-                            else if (alg.tip === AlgoritmaTipi.ACO) sonuc = karincaKolonisiCalistir(filtrelenmisGraf, s, d, mevcutAgirliklar);
-                            else if (alg.tip === AlgoritmaTipi.Q_LEARNING) sonuc = pekisirmeliOgrenmeCalistir(filtrelenmisGraf, s, d, mevcutAgirliklar);
-                            else sonuc = yapayAriKolonisiCalistir(filtrelenmisGraf, s, d, mevcutAgirliklar);
+                            if (alg.tip === AlgoritmaTipi.GENETIC) sonuc = genetikAlgoritmayiCalistir(filtrelenmisGraf, s, d, guncelParametreler);
+                            else if (alg.tip === AlgoritmaTipi.ACO) sonuc = karincaKolonisiCalistir(filtrelenmisGraf, s, d, guncelParametreler);
+                            else if (alg.tip === AlgoritmaTipi.Q_LEARNING) sonuc = pekisirmeliOgrenmeCalistir(filtrelenmisGraf, s, d, guncelParametreler);
+                            else sonuc = yapayAriKolonisiCalistir(filtrelenmisGraf, s, d, guncelParametreler);
                         } catch (e) {
                             sonuc = { path: [], metrics: { weightedCost: Infinity }, executionTime: 0 };
                         }
@@ -213,7 +256,13 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
                             maliyet: basarili ? sonuc.metrics.weightedCost : null,
                             sure: basarili ? sure : null,
                             gerekce: basarili ? "Başarılı" : "Algoritma Yakınsayamadı / Zaman Aşımı",
-                            agirliklar: { wGecikme: mevcutAgirliklar.wGecikme!, wGuven: mevcutAgirliklar.wGuvenilirlik!, wKaynak: mevcutAgirliklar.wKaynak! }
+                            agirliklar: { wGecikme: mevcutAgirliklar.wGecikme!, wGuven: mevcutAgirliklar.wGuvenilirlik!, wKaynak: mevcutAgirliklar.wKaynak! },
+                            detaylar: basarili ? {
+                                delay: sonuc.metrics.totalDelay || 0,
+                                reliability: sonuc.metrics.totalReliability || 0,
+                                resourceCost: sonuc.metrics.resourceCost || 0
+                            } : undefined,
+                            seed: seed
                         });
 
                         if (tekrar % 5 === 0) await new Promise(r => setTimeout(r, 0)); // UI Blocking Önleme
@@ -254,26 +303,49 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
     };
 
     const csvIndir = () => {
-        let csv = `# Deney Konfigürasyonu\n# Ağırlıklar: Gecikme=${mevcutAgirliklar.wGecikme}, Güvenilirlik=${mevcutAgirliklar.wGuvenilirlik}, Kaynak=${mevcutAgirliklar.wKaynak}\n# Profil: ${AGIRLIK_PROFILLERI[seciliProfil].etiket}\n# Senaryolar: 20, Tekrarlar: 5\n\n`;
-        csv += "Senaryo,S,D,BantGenisligi,Algoritma,SenaryoDurumu,KosumID,KosumDurumu,Maliyet,Sure(ms),RunGerekce,Profil,W_Gecikme,W_Guven,W_Kaynak\n";
+        let csv = `# Deney Raporu\n# Profil: ${AGIRLIK_PROFILLERI[seciliProfil].etiket}\n# Tarih: ${new Date().toLocaleString()}\n\n`;
+        // Header: Senaryo + Algoritma + Metrik Ortalamaları + İstatistikler
+        csv += "Senaryo,Kaynak,Hedef,Talep(Mbps),Algoritma,TekrarSayisi,Durum,BasariOrani(%),OrtSure(ms),MinSure(ms),MaxSure(ms),OrtGecikme(ms),OrtGuvenilirlik(%),OrtKaynakTuketimi,OrtMaliyet(Weighted),StdSapmaMaliyet\n";
 
         sonuclar.forEach(r => {
-            if (r.kosumlar.length === 0) {
-                // Uygunsuz Durum
-                csv += `${r.senaryoNo},${r.kaynak},${r.hedef},${r.kullanilanBantGenisligi},${r.algoritma},${r.durum},-,BAŞARISIZ,,,"${r.gerekce}",${seciliProfil},${mevcutAgirliklar.wGecikme},${mevcutAgirliklar.wGuvenilirlik},${mevcutAgirliklar.wKaynak}\n`;
-            } else {
-                r.kosumlar.forEach(kosum => {
-                    const kosumDurumu = kosum.basarili ? "BAŞARILI" : "BAŞARISIZ";
-                    const maliyetDegeri = kosum.maliyet !== null ? kosum.maliyet.toFixed(4) : "";
-                    const sureDegeri = kosum.sure !== null ? kosum.sure.toFixed(2) : "";
-                    csv += `${r.senaryoNo},${r.kaynak},${r.hedef},${r.kullanilanBantGenisligi},${r.algoritma},${r.durum},${kosum.kosumId},${kosumDurumu},${maliyetDegeri},${sureDegeri},"${kosum.gerekce}",${seciliProfil},${kosum.agirliklar.wGecikme},${kosum.agirliklar.wGuven},${kosum.agirliklar.wKaynak}\n`;
-                });
-            }
+            const ist = r.istatistikler;
+            const basariYuzdesi = (ist.basariOrani * 100).toFixed(0);
+
+            // Metrik Ortalamalarını Hesapla (Sadece başarılı koşumlar)
+            const basariliKosumlar = r.kosumlar.filter(k => k.basarili);
+            const seedListesi = r.kosumlar.map(k => k.seed).join(";");
+
+            const ortGecikme = basariliKosumlar.length ? (basariliKosumlar.reduce((acc, k) => acc + (k.detaylar?.delay || 0), 0) / basariliKosumlar.length).toFixed(2) : "-";
+            const ortGuven = basariliKosumlar.length ? (basariliKosumlar.reduce((acc, k) => acc + (k.detaylar?.reliability || 0), 0) / basariliKosumlar.length * 100).toFixed(6) : "-"; // Yüzdelik gösterim
+            const ortKaynak = basariliKosumlar.length ? (basariliKosumlar.reduce((acc, k) => acc + (k.detaylar?.resourceCost || 0), 0) / basariliKosumlar.length).toFixed(2) : "-";
+
+            const row = [
+                r.senaryoNo,
+                r.kaynak,
+                r.hedef,
+                r.kullanilanBantGenisligi,
+                r.algoritma,
+                "5", // Tekrar Sayısı
+                r.durum,
+                basariYuzdesi,
+                typeof ist.ortSure === 'number' ? ist.ortSure.toFixed(2) : ist.ortSure,
+                typeof ist.minSure === 'number' ? ist.minSure.toFixed(2) : "-",
+                typeof ist.maxSure === 'number' ? ist.maxSure.toFixed(2) : "-",
+                ortGecikme, // Gecikme
+                ortGuven,   // Güvenilirlik
+                ortKaynak,  // Kaynak Tüketimi
+                ist.ortMaliyet, // Ağırlıklı Maliyet (En sonda)
+                ist.stdSapmaMaliyet, // Standart Sapma
+                seedListesi // Tohumlar
+            ].join(",");
+
+            csv += row + "\n";
         });
+
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `bsm307_analiz_${seciliProfil.toLowerCase()}.csv`;
+        link.download = `bsm307_ozet_analiz_${seciliProfil.toLowerCase()}.csv`;
         link.click();
     };
 
@@ -343,17 +415,31 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
                         </button>
                     )}
                     <button
-                        onClick={deneyleriBaslat}
+                        onClick={() => deneyleriBaslat('random')}
                         disabled={calisiyor}
                         style={{
                             padding: '8px 20px',
                             background: calisiyor ? '#334155' : 'linear-gradient(to right, #2563eb, #1d4ed8)',
                             color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
                             cursor: calisiyor ? 'not-allowed' : 'pointer',
-                            minWidth: '120px'
+                            minWidth: '100px'
                         }}
                     >
-                        {calisiyor ? `%${ilerleme.toFixed(0)}` : 'Başlat'}
+                        {calisiyor ? `%${ilerleme.toFixed(0)}` : 'Başlat (Rastgele)'}
+                    </button>
+
+                    <button
+                        onClick={() => deneyleriBaslat('csv')}
+                        disabled={calisiyor}
+                        style={{
+                            padding: '8px 20px',
+                            background: calisiyor ? '#334155' : 'linear-gradient(to right, #d97706, #b45309)',
+                            color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
+                            cursor: calisiyor ? 'not-allowed' : 'pointer',
+                            minWidth: '140px'
+                        }}
+                    >
+                        Hazır Test Senaryoları
                     </button>
                     <button onClick={() => setSonuclar([])} style={{ padding: '8px', background: '#334155', color: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>X</button>
                 </div>
@@ -366,8 +452,11 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
                 {!calisiyor && sonuclar.length > 0 && gorunumModu === 'tablo' && (
                     <div style={{
                         display: 'flex', gap: '20px', marginBottom: '20px',
-                        background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '15px'
+                        background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '15px', position: 'relative'
                     }}>
+                        <div style={{ position: 'absolute', top: '-10px', left: '15px', fontSize: '10px', background: '#334155', padding: '2px 8px', borderRadius: '4px', color: '#94a3b8' }}>
+                            Son İşlenen Seed: <span style={{ color: 'white' }}>{sonIslenenSeed}</span>
+                        </div>
                         <div style={{ textAlign: 'center' }}>
                             <div style={{ fontSize: '10px', color: '#94a3b8' }}>TOPLAM SENARYO</div>
                             <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#e2e8f0' }}>{toplamSenaryo}</div>

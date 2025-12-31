@@ -223,7 +223,7 @@ export const genetikAlgoritmayiCalistir = (
     bitisDugum: number,
     parametreler: AlgoritmaParametreleri = { populationSize: 50, iterations: 50 }
 ): YolSonucu => {
-    const baslamaZamani = performance.now();
+    const baslamaZamani = performance.now();  // Çalıştırma süresi ölçümü için.
     const rng = new TohumluRNG(parametreler.seed ?? Math.floor(Math.random() * 99999));
     const baglantiHaritasi = haritaOlustur(cizge.links);
 
