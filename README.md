@@ -136,7 +136,7 @@ Senaryo,Algoritma,Durum,Başarı(%),Ort.Süre,Seed Listesi
 
 <div align="center">
 
-**Bartın Üniversitesi - Bilgisayar Mühendisliği**  
+**Bartın Üniversitesi - BTBS**  
 *BSM307 Güz Dönemi Projesi - 2025*
 
 </div>
