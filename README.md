@@ -97,10 +97,10 @@ Sistem, deney sonunda aşağıdaki sütunları içeren detaylı bir CSV dosyası
 
 ## ⚙️ 4. Teknik Mimari ve Matematik
 
-### Maliyet Fonksiyonu ("Hamburger Analizi")
+### Maliyet Fonksiyonu
 Ağdaki her bağlantının kalitesi, kullanıcı tercihlerine göre ağırlıklandırılmış bir skorla belirlenir:
 
-$$WeightedCost = (W_{Gecikme} \times Gecikme) + (W_{Güven} \times -log(Güvenilirlik)) + (W_{Kaynak} \times \frac{1}{BantGenişliği})$$
+$$WeightedCost = (W_{Gecikme} \times Gecikme) + (W_{Güven} \times -log(Güvenilirlik)) + (W_{Kaynak} \times \frac{1}{BantGenişliği}) + (HopCezası)$$
 
 ### Dosya Ağacı
 Proje modüler ve sürdürülebilir bir yapıda tasarlanmıştır:
