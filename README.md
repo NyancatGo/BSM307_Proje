@@ -9,141 +9,134 @@
 ![Tailwind](https://img.shields.io/badge/Style-TailwindCSS-38bdf8?style=for-the-badge&logo=tailwindcss)
 ![Status](https://img.shields.io/badge/Project-COMPLETED-success?style=for-the-badge)
 
-<h3>🚀 Yeni Nesil Ağ Simülasyonu ve Yapay Zeka Laboratuvarı</h3>
+<br />
 
-<p>
-  <strong>Ders:</strong> BSM307 - Bilgisayar Ağları (Güz 2025)<br>
-  <strong>Konu:</strong> QoS Odaklı Çok Amaçlı Rotalama için Meta-Sezgisel ve Pekiştirmeli Öğrenme Yaklaşımları
+<h1>🚀 Yeni Nesil Ağ Simülasyonu ve Yapay Zeka Laboratuvarı</h1>
+
+<p align="center">
+  <strong>Modern Veri Merkezleri ve Uydu Ağları için QoS Tabanlı Rotalama Simülatörü</strong>
 </p>
 
-[Özellikler](#-1-proje-özellikleri) • [Algoritmalar](#-2-yapay-zeka-çekirdeği) • [Deney Laboratuvarı](#-3-deney-laboratuvarı-ve-analiz) • [Kurulum](#-5-kurulum-ve-çalıştırma)
+<p align="center">
+  <a href="#-proje-hakkında">Proje Hakkında</a> •
+  <a href="#-kurulum">Kurulum</a> •
+  <a href="#-özellikler">Özellikler</a> •
+  <a href="#-yapay-zeka-algoritmaları">Algoritmalar</a> •
+  <a href="#-deney-laboratuvarı">Deney Laboratuvarı</a>
+</p>
 
 </div>
 
 ---
 
-## 📖 1. Proje Hakkında
-Bu proje, modern veri merkezleri ve bulut ağlarında karşılaşılan **karmaşık rotalama (routing)** problemlerini çözmek için geliştirilmiş, yüksek performanslı bir simülasyon aracıdır. Standart algoritmaların aksine, bu proje **Gecikme (Latency)**, **Güvenilirlik (Reliability)**, **Bant Genişliği (Bandwidth)** ve **Maliyet (Cost)** gibi çelişen hedefleri aynı anda optimize etmeye çalışır.
+## 📖 Proje Hakkında
 
-### ⭐ Öne Çıkan Özellikler
+**BSM307 Bilgisayar Ağları** dersi kapsamında geliştirilen bu proje, geleneksel rotalama algoritmalarının (Dijkstra, Bellman-Ford) yetersiz kaldığı **çok kriterli (Multi-Objective)** optimizasyon problemlerine çözüm arar.
 
-| Özellik | Açıklama |
-|---------|----------|
-| **🌍 3D İnteraktif Dünya** | 250+ düğümlü ağı dünya üzerinde X-Ray modu, uydu görüntüleri ve dinamik bağlantılarla görselleştirir. |
-| **🧠 4 Farklı Yapay Zeka** | Genetik Algoritma, Karınca Kolonisi, Yapay Arı Kolonisi ve Q-Learning algoritmalarını aynı anda yarıştırır. |
-| **🧪 Deney Modülü (V2.0)** | CSV tabanlı hazır senaryoları yükler veya rastgele stres testleri oluşturur. **Seed Takibi** ile %100 tekrarlanabilirlik sağlar. |
-| **📊 Detaylı Raporlama** | Her deneyin Min/Max süreleri, Standart Sapması ve Maliyet analizini içeren Excel/CSV formatında profesyonel rapor üretir. |
-| **🎛️ Dinamik QoS** | Ağırlık kaydırıcıları ile "Gecikme mi önemli, Güvenilirlik mi?" sorusuna anlık yanıt arar. |
+Proje, **250'den fazla düğüm** içeren kompleks bir ağ üzerinde; Gecikme, Güvenilirlik, Bant Genişliği ve Maliyet gibi çelişen hedefleri aynı anda optimize eden 4 farklı yapay zeka algoritmasını simüle eder ve sonuçları **3D Dünya Küresi** üzerinde görselleştirir.
+
+> **Temel Farkımız:** Sadece "en kısa" yolu değil; "en güvenilir", "en hızlı" ve "en az maliyetli" yolu aynı anda bulabilen, ağırlıkları dinamik olarak değiştirilebilir hibrit bir yapı sunmasıdır.
 
 ---
 
-## 🧠 2. Yapay Zeka Çekirdeği
+## 💻 Özellikler
 
-Proje, optimum rotayı bulmak için literatürdeki en güçlü meta-sezgisel yöntemleri kullanır.
+### 🌍 1. İleri Seviye 3D Görselleştirme
+*   **X-Ray Modu:** Dünya küresinin arkasındaki düğümleri görebilme.
+*   **Uydu Görünümü:** Gerçekçi dünya haritası üzerinde düğüm yerleşimi.
+*   **Dinamik Etkileşim:** Düğümlere tıklayarak kaynak/hedef seçimi, rotayı anlık izleme.
 
-<details>
-<summary><strong>🐜 Karınca Kolonisi Optimizasyonu (ACO)</strong> - <em>Tıklayarak Detayları Gör</em></summary>
+### 🧠 2. Dört Farklı "Solver" Motoru
+Aynı problem üzerinde 4 farklı yaklaşımı yarıştırın:
+*   **Genetic Algorithm (GA)** - Evrimsel hesaplama.
+*   **Ant Colony Optimization (ACO)** - Sürü zekası.
+*   **Artificial Bee Colony (ABC)** - Kolektif zeka.
+*   **Q-Learning (RL)** - Pekiştirmeli öğrenme (Reinforcement Learning).
 
-*   **Mantık:** Doğadaki karıncaların yiyecek ararken bıraktıkları feromon izlerini takip etmesi prensibine dayanır.
-*   **Avantajı:** Dinamik ağlarda çok hızlı adapte olur.
-*   **Bu Projedeki Rolü:** Feromon matrisi üzerinden olasılıksal yol seçimi yapar.
-</details>
-
-<details>
-<summary><strong>🧬 Genetik Algoritma (GA)</strong> - <em>Tıklayarak Detayları Gör</em></summary>
-
-*   **Mantık:** Evrim teorisini taklit eder. Başlangıçta rastgele yollar üretilir, en iyiler seçilir ("Doğal Seçilim"), bunlar çiftleşir ("Çaprazlama") ve mutasyona uğrar.
-*   **Avantajı:** Çok geniş arama uzaylarında global optimumu bulma şansı yüksektir.
-*   **Bu Projedeki Rolü:** Popülasyon tabanlı rota evrimi gerçekleştirir.
-</details>
-
-<details>
-<summary><strong>🐝 Yapay Arı Kolonisi (ABC)</strong> - <em>Tıklayarak Detayları Gör</em></summary>
-
-*   **Mantık:** Arıların iş bölümünü (İşçi, Gözcü, Kaşif) modeller. İşçi arılar bilinen kaynakları sömürürken, kaşif arılar yeni yollar arar.
-*   **Avantajı:** Lokal tuzaklardan kaçma yeteneği yüksektir (Kaşif arı mekanizması).
-*   **Bu Projedeki Rolü:** Komşuluk araştırması ile mevcut rotaları iyileştirir.
-</details>
-
-<details>
-<summary><strong>🤖 Q-Learning (RL)</strong> - <em>Tıklayarak Detayları Gör</em></summary>
-
-*   **Mantık:** Bir "Ajan" (Agent) çevreyle etkileşime girer. Doğru hareket ödüllendirilir (+Reward), yanlış hareket cezalandırılır (-Penalty).
-*   **Avantajı:** Öğrendikçe hızlanır, "akıllı" kararlar almaya başlar.
-*   **Bu Projedeki Rolü:** Q-Tablosu (State-Action) üzerinden en karlı sonraki düğümü (Next Hop) seçmeyi öğrenir.
-</details>
+### � 3. Bilimsel Deney Modülü (V2.0)
+*   **Otomatik Stres Testi:** Rastgele üretilen binlerce senaryoyu arka arkaya çalıştırın.
+*   **CSV Entegrasyonu:** `BSM307...DemandData.csv` dosyasındaki tanımlı senaryoları tek tıkla yükleyin.
+*   **Seed (Tohum) Takibi:** Her deneyin tekrarlanabilir olması için kriptografik seed takibi.
+*   **Excel/CSV Raporlama:** Min/Max Süre, Std. Sapma, Başarı Oranı ve Maliyet analizi içeren akademik çıktı.
 
 ---
 
-## 🧪 3. Deney Laboratuvarı ve Analiz
+## 🧠 Yapay Zeka Algoritmaları
 
-Bu modül, projenin **bilimsel yönünü** temsil eder. Tekil hesaplamalar yerine, yüzlerce senaryoyu arka arkaya çalıştırarak istatistiksel veri toplar.
+Tüm algoritmalar **TypeScript** ile `src/services/algoritmalar.ts` altında sıfırdan implemente edilmiştir.
 
-### 📂 Yeni Özellik: Hazır Senaryo Yükleyici (CSV)
-Artık `DemandData.csv` dosyasındaki standart test senaryolarını tek tuşla yükleyebilirsiniz.
-1.  **"Hazır Senaryoları Test Et"** butonuna basın.
-2.  Sistem otomasyonu başlatır ve her senaryoyu 5 kez tekrar eder.
-3.  **Seed Takibi:** Her tekrar için benzersiz bir sayısal tohum (Seed) üretilir ve loglanır. Bu sayede deney sonuçları **kanıtlanabilir ve tekrarlanabilir** olur.
-
-### 📋 Rapor Çıktısı (Örnek)
-Sistem, deney sonunda aşağıdaki sütunları içeren detaylı bir CSV dosyası oluşturur:
-
-| Senaryo | Algoritma | Durum | Başarı(%) | Ort. Süre | Min/Max Süre | Ort. Maliyet | Std. Sapma | Seed Listesi |
-|---------|-----------|-------|-----------|-----------|--------------|--------------|------------|--------------|
-| 1 | GA | BAŞARILI | 100 | 45ms | 42ms / 48ms | 12.5 | 0.8 | `1231;5521...`|
-| 1 | ACO | BAŞARILI | 100 | 120ms | 115ms / 125ms| 12.4 | 0.2 | `9912;1123...`|
+| Algoritma | Kategori | Nasıl Çalışır? |
+|-----------|----------|----------------|
+| **Karınca Kolonisi (ACO)** | Meta-Sezgisel | Sanal karıncalar ağ üzerinde dolaşır ve iyi yollara "feromon" bırakır. Sonraki karıncalar feromonu yoğun yolları tercih eder. |
+| **Genetik Algoritma (GA)** | Meta-Sezgisel | Rastgele rotalardan oluşan bir popülasyon yaratılır. En iyiler seçilir, çaprazlanır ve mutasyona uğratılarak "süper birey" aranır. |
+| **Yapay Arı Kolonisi (ABC)** | Meta-Sezgisel | İşçi arılar mevcut yolları iyileştirir, gözcü arılar en iyi kaynaklara yönelir, kaşif arılar tıkandığında rastgele yeni yollar arar. |
+| **Q-Learning** | RL (Yapay Zeka) | Bir ajan her adımda ödül/ceza alarak hangi düğümden hangisine gitmenin "karlı" olduğunu öğrenir (Q-Table Update). |
 
 ---
 
-## ⚙️ 4. Teknik Mimari ve Matematik
+## ⚙️ Teknik Mimari ve Matematik
 
-### Maliyet Fonksiyonu
-Ağdaki her bağlantının kalitesi, kullanıcı tercihlerine göre ağırlıklandırılmış bir skorla belirlenir:
+### 📐 Maliyet Fonksiyonu (Weighted Cost)
+Sistem, bir yolun kalitesini hesaplarken kullanıcı tarafından belirlenen ağırlıkları ($W$) dikkate alır.
 
 $$WeightedCost = (W_{Gecikme} \times Gecikme) + (W_{Güven} \times -log(Güvenilirlik)) + (W_{Kaynak} \times \frac{1}{BantGenişliği}) + (HopCezası)$$
 
-### Dosya Ağacı
-Proje modüler ve sürdürülebilir bir yapıda tasarlanmıştır:
-
-```text
+### 📁 Proje Yapısı
+```bash
 /src
-  ├── components/
-  │     ├── DunyaHaritasi.tsx     # 🧊 3D Render Motoru
-  │     ├── DeneyYurutucu.tsx     # 📊 İstatistik ve Test Merkezi
-  │     └── ...
-  ├── services/
-  │     ├── algoritmalar.ts       # 🧠 Yapay Zeka Mantığı (Core)
-  │     ├── hesaplama.worker.ts   # ⚡ Paralel İşlem Birimi (Web Worker)
-  │     └── ...
-  └── App.tsx                     # 📱 Ana Kontrol Paneli
+├── components/
+│   ├── DunyaHaritasi.tsx  # 🌀 Three.js Render Mantığı
+│   ├── DeneyYurutucu.tsx  # 📊 Test Otomasyonu & İstatistik
+│   └── KontrolPaneli.tsx  # 🎛️ UI Kontrolleri
+├── services/
+│   ├── algoritmalar.ts    # 🧠 AI Çekirdeği (GA, ACO, ABC, QL)
+│   └── hesaplama.worker.ts # ⚡ Paralel Hesaplama (Web Worker)
+├── models/
+│   └── Graph.ts           # 🕸️ Çizge Veri Yapısı
+└── App.tsx                # � Ana Uygulama
 ```
 
 ---
 
-## 🚀 5. Kurulum ve Çalıştırma
+## 🧪 Deney Laboratuvarı
 
-Bilgisayarınızda **Node.js** (v16+) yüklü olmalıdır.
+**Nasıl Kullanılır?**
+1.  **Mod Seçimi:** Sağ üstteki butondan "Hazır Senaryoları Test Et" veya "Rastgele Başlat" seçeneğini kullanın.
+2.  **İlerleme:** Sistem senaryoları işlerken anlık durumu (Başarılı/Başarısız) ve kullanılan **Seed** değerini gösterir.
+3.  **Raporlama:** İşlem bitince "CSV İndir" butonu aktif olur.
 
-1.  **Projeyi İndirin:**
+**Örnek CSV Çıktısı:**
+```csv
+Senaryo,Algoritma,Durum,Başarı(%),Ort.Süre,Seed Listesi
+1,GA,BAŞARILI,100,45.2ms,88123;11234;...
+1,ACO,BAŞARILI,100,120.5ms,99123;55123;...
+```
+
+---
+
+## 🚀 Kurulum
+
+1.  **Repoyu Klonla:**
     ```bash
     git clone https://github.com/NyancatGo/BSM307_Proje.git
-    cd BSM307_Proje/project
+    cd project
     ```
 
-2.  **Kütüphaneleri Yükleyin:**
+2.  **Paketleri Yükle:**
     ```bash
     npm install
     ```
 
-3.  **Başlatın:**
+3.  **Başlat:**
     ```bash
     npm run dev
     ```
-    
-    Terminalde çıkan linke (örn: `http://localhost:5173`) tıklayarak simülasyona başlayın!
 
 ---
 
 <div align="center">
-  <p>Bartın Üniversitesi - BTBS</p>
+
+**Bartın Üniversitesi - Bilgisayar Mühendisliği**  
+*BSM307 Güz Dönemi Projesi - 2025*
+
 </div>
