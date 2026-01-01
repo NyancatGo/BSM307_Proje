@@ -305,7 +305,7 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
     const csvIndir = () => {
         let csv = `# Deney Raporu\n# Profil: ${AGIRLIK_PROFILLERI[seciliProfil].etiket}\n# Tarih: ${new Date().toLocaleString()}\n\n`;
         // Header: Senaryo + Algoritma + Metrik Ortalamaları + İstatistikler
-        csv += "Senaryo,Kaynak,Hedef,Talep(Mbps),Algoritma,TekrarSayisi,Durum,BasariOrani(%),OrtSure(ms),MinSure(ms),MaxSure(ms),OrtGecikme(ms),OrtGuvenilirlik(%),OrtKaynakTuketimi,OrtMaliyet(Weighted),StdSapmaMaliyet\n";
+        csv += "Senaryo,Kaynak,Hedef,Talep(Mbps),Algoritma,TekrarSayisi,Durum,BasariOrani(%),OrtSure(ms),MinSure(ms),MaxSure(ms),OrtGecikme(ms),OrtGuvenilirlik(%),OrtKaynakTuketimi,OrtMaliyet(Weighted),StdSapmaMaliyet,KullanilanSeedler\n";
 
         sonuclar.forEach(r => {
             const ist = r.istatistikler;
@@ -334,8 +334,8 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
                 ortGecikme, // Gecikme
                 ortGuven,   // Güvenilirlik
                 ortKaynak,  // Kaynak Tüketimi
-                ist.ortMaliyet, // Ağırlıklı Maliyet (En sonda)
-                ist.stdSapmaMaliyet, // Standart Sapma
+                typeof ist.ortMaliyet === 'number' ? ist.ortMaliyet.toFixed(4) : ist.ortMaliyet, // Ağırlıklı Maliyet (En sonda)
+                typeof ist.stdSapmaMaliyet === 'number' ? ist.stdSapmaMaliyet.toFixed(4) : ist.stdSapmaMaliyet, // Standart Sapma
                 seedListesi // Tohumlar
             ].join(",");
 
