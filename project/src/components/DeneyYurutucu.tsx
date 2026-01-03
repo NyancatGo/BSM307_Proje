@@ -303,7 +303,8 @@ const DeneyYurutucu: React.FC<DeneyYurutucuProps> = ({ cizge }) => {
     };
 
     const csvIndir = () => {
-        let csv = `# Deney Raporu\n# Profil: ${AGIRLIK_PROFILLERI[seciliProfil].etiket}\n# Tarih: ${new Date().toLocaleString()}\n\n`;
+        const p = AGIRLIK_PROFILLERI[seciliProfil];
+        let csv = `# Deney Raporu\n# Profil: ${p.etiket} (Gecikme: ${p.wGecikme}, Guvenilirlik: ${p.wGuvenilirlik}, Kaynak: ${p.wKaynak})\n# Tarih: ${new Date().toLocaleString()}\n\n`;
         // Header: Senaryo + Algoritma + Metrik Ortalamaları + İstatistikler
         csv += "Senaryo,Kaynak,Hedef,Talep(Mbps),Algoritma,TekrarSayisi,Durum,BasariOrani(%),OrtSure(ms),MinSure(ms),MaxSure(ms),OrtGecikme(ms),OrtGuvenilirlik(%),OrtKaynakTuketimi,OrtMaliyet(Weighted),StdSapmaMaliyet,KullanilanSeedler\n";
 
